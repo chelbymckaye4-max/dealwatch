@@ -333,7 +333,7 @@
   var filters = { verified: false, coupon: false };
   var MAX_AGE_H = 72;   // hide deals older than this, so only live deals show
   var app = document.getElementById("app");
-  var subText = "", updatedText = "";
+  var subText = "", updatedText = "", scanStats = null;
 
   var store = {
     get: function (k) { try { return localStorage.getItem(k) || ""; } catch (e) { return ""; } },
@@ -376,6 +376,14 @@
     function done() { if (btn) { var o = label || btn.textContent; btn.textContent = "Copied"; setTimeout(function () { btn.textContent = o; }, 1400); } }
     if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(text).then(done, fallback); } else { fallback(); }
     function fallback() { var t = document.createElement("textarea"); t.value = text; document.body.appendChild(t); t.select(); try { document.execCommand("copy"); } catch (e) {} document.body.removeChild(t); done(); }
+  }
+  function emptyText(def) {
+    var s = scanStats;
+    if (!s || !s.posts) return def;
+    return "No live deals beat your thresholds yet. The last scan checked " + s.posts + " posts" +
+      (s.too_old ? " (" + s.too_old + " too old)" : "") +
+      (s.below_your_bar ? ", " + s.below_your_bar + " below your discount bar" : "") +
+      ". New deals appear here the moment one qualifies.";
   }
   function strike(a) {
     if (!a.deal_price) return null;
@@ -556,7 +564,7 @@
     var mine = filtered(data).filter(function (a) { return a.style_terms && a.style_terms.length; }).sort(byScore);
     if (mine.length) { app.appendChild(sectionHead(boutique() ? "Picked for you" : "For You", "#/deals", boutique() ? "View all" : "See All")); app.appendChild(grid(mine, "", 4)); }
     app.appendChild(sectionHead(boutique() ? "Popular" : "Trending Now", "#/deals", boutique() ? "View all" : "See All"));
-    app.appendChild(grid(filtered(data).sort(byScore), "No deals yet. Dealwatch is watching and will alert you.", 6));
+    app.appendChild(grid(filtered(data).sort(byScore), emptyText("No deals yet. Dealwatch is watching and will alert you."), 6));
     var newest = filtered(data).sort(function (x, y) { return y.ts - x.ts; });
     if (newest.length > 6) { app.appendChild(sectionHead("Just In", "#/deals")); app.appendChild(grid(newest, "", 4)); }
     refreshRow();
@@ -607,7 +615,7 @@
     });
     app.appendChild(chips);
     var items = gid ? data.filter(function (a) { return groupOf(a.category) === gid; }) : data;
-    app.appendChild(grid(sorted(filtered(items)), "No deals yet. Run dealwatch.py and check back."));
+    app.appendChild(grid(sorted(filtered(items)), emptyText("No deals yet. Run dealwatch.py and check back.")));
     refreshRow();
   }
 
@@ -837,7 +845,14 @@
       .then(function (j) { styleData = j; })
       .catch(function () {});
   }
-  updateBadge(); load(); loadStyle();
+  function loadStats() {
+    if (!window.fetch) return;
+    fetch("top.json?t=" + Date.now(), { cache: "no-store" })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) { scanStats = (j && j.stats) || null; if (scanStats) render(); })
+      .catch(function () {});
+  }
+  updateBadge(); load(); loadStyle(); loadStats();
   if ("serviceWorker" in navigator) { try { navigator.serviceWorker.register("sw.js"); } catch (e) {} }
 })();
 </script>

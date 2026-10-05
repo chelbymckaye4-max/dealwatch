@@ -13,7 +13,7 @@ Sources:
 Env vars: NTFY_TOPIC, BESTBUY_KEY, KEEPA_KEY, SERPAPI_KEY, EBAY_CLIENT_ID/SECRET (all optional)
 Outputs : state.json (dedupe + price history), alerts.json (feeds the dashboard)
 """
-import base64, calendar, datetime, json, os, re, smtplib, ssl, statistics, time
+import base64, calendar, collections, datetime, json, os, re, smtplib, ssl, statistics, time
 from email.message import EmailMessage
 from html import escape, unescape
 from urllib.parse import quote_plus, urljoin
@@ -553,6 +553,7 @@ def fav_bar(title):
 FEED_MAX_AGE_HOURS = 48         # ignore deal posts older than this
 FLIGHT_MAX_AGE_HOURS = 96       # flight deals last a bit longer
 ALERT_MAX_AGE_HOURS = 72        # alerts older than this are dropped from the app
+STATS = collections.Counter()     # what the last scan did (shown in the app when no deals qualify)
 EXPIRED_RE = re.compile(r"\b(expired|sold out|out of stock|deal (?:has )?ended|no longer available|dead deal)\b", re.I)
 
 def entry_ts(e):
@@ -866,10 +867,10 @@ def money(n):
     return f"-${abs(n)}" if n < 0 else f"${n}"
 
 def push(category, source, title, detail, url=None, urgent=False, pct=None,
-         cost=None, query=None, text="", image=None, images=None, credit=None, posted=None):
+         cost=None, query=None, text="", image=None, images=None, credit=None, posted=None, was=None):
     est = resale_estimate(query, cost)
     deal_price = cost or title_cost(title)
-    was_price = parse_prices(title)["original"]
+    was_price = was or parse_prices(title)["original"]
     if not was_price:
         wm = re.search(r"was \$([\d,]+(?:\.\d+)?)", detail or "")
         was_price = float(wm.group(1).replace(",", "")) if wm else None
@@ -953,6 +954,21 @@ def estimate_discount(title):
     if m and int(m.group(1)) <= 95 and not re.search(r"up to\s*$", title[max(0, m.start() - 8):m.start()], re.I):
         return int(m.group(1))
     return None
+
+def deal_discount(title, summary=""):
+    """(pct off, 'was' price). Also looks in the post summary for a 'was' price when the title has only a price."""
+    pp = parse_prices(title)
+    orig = pp["original"]
+    if pp["price"] and not orig and summary:
+        text = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", unescape(summary)))[:600]
+        so = parse_prices(text)["original"]
+        if so and so > pp["price"] * 1.05:
+            orig = so
+    if pp["price"] and orig:
+        pct = round((1 - pp["price"] / orig) * 100)
+        if 5 <= pct <= 90:
+            return pct, orig
+    return estimate_discount(title), None
 
 def home_unit_hit(title):
     """Return (price_per_unit, unit) if a household deal beats your per-unit target."""
@@ -1060,24 +1076,32 @@ def check_feeds():
                 time.sleep(0.4)                  # be polite to search feeds
             if resp.status_code != 200:
                 print(f"feed {name}: HTTP {resp.status_code} (some sites block cloud servers; see README)")
+                STATS["feeds_blocked"] += 1
                 continue
             feed = feedparser.parse(resp.content)
+            STATS["feeds_read"] += 1
         except Exception as e:
             print(f"feed error {name}: {e}")
+            STATS["feeds_blocked"] += 1
             continue
         for e in feed.entries[:40]:
             title, link = e.get("title", ""), e.get("link", "")
+            STATS["posts"] += 1
             posted = entry_ts(e)
             if posted and time.time() - posted > FEED_MAX_AGE_HOURS * 3600:
+                STATS["too_old"] += 1
                 continue                         # old post (search feeds return old deals too)
             if EXPIRED_RE.search(title + " " + (e.get("summary") or "")[:300]):
+                STATS["expired"] += 1
                 continue                         # marked expired / sold out
             if not title or already_seen(link or title):
+                STATS["already_seen"] += 1
                 continue
-            pct = estimate_discount(title)
+            pct, was = deal_discount(title, e.get("summary", ""))
             is_error = bool(ERROR_WORDS.search(title))
             res = classify(title, e.get("summary", ""), cat)
             if res is None:
+                STATS["filtered_out"] += 1
                 continue
             category, bar, note = res
             if BRANDS_RE and BRANDS_RE.search(title):
@@ -1086,8 +1110,10 @@ def check_feeds():
             if fb:
                 bar = min(bar, fb)
             if cat == "favorites" and category == cat and not re.search(r"\bsonos\b", title, re.I):
+                STATS["not_your_interests"] += 1
                 continue
             if (name in GENERAL_FEEDS or cat in ("clearance", "favorites")) and category == cat and not (ELECTRONICS_RE.search(title) or is_error):
+                STATS["not_your_interests"] += 1
                 continue                         # general feed item that matches none of your interests
             if category in ("clearance", "favorites"):
                 category = "electronics"
@@ -1109,7 +1135,11 @@ def check_feeds():
                      urgent=is_error or (pct or 0) >= 70, pct=pct,
                      cost=title_cost(title) if flip else None,
                      query=clean_query(title) if flip else None,
-                     text=e.get("summary", ""), images=entry_images(e), posted=posted)
+                     text=e.get("summary", ""), images=entry_images(e), posted=posted, was=was)
+                STATS["alerted"] += 1
+            else:
+                STATS["below_your_bar"] += 1
+    print("feed scan:", dict(STATS))
     for c, d in due.items():
         if d:
             last[c] = now
@@ -1629,7 +1659,7 @@ def write_top():
             "urgent": a.get("urgent"), "verified": a.get("verified"), "ts": a["ts"], "image": a.get("image"),
             "code": (a.get("coupon") or {}).get("code")} for a in top]
     with open(TOP_FILE, "w") as f:
-        json.dump({"updated": int(now), "deals": out}, f)
+        json.dump({"updated": int(now), "deals": out, "stats": dict(STATS)}, f)
 
 # ---- Store alert emails -> deals (Gmail, read-only) --------------------------
 # For stores that block scrapers (The RealReal, Perigold, Hogan...): sign up for their sale / price-drop
@@ -1741,9 +1771,11 @@ def apply_config():
 # ---- Run -------------------------------------------------------------------
 if __name__ == "__main__":
     apply_config()
-    if state.get("schema") != 3:             # one-time clean-up: earlier alerts used the old price reader
+    if state.get("schema") != 4:             # one-time clean-up: earlier alerts used the old price reader
         alerts.clear()
-        state["schema"] = 3
+        state["seen"] = {}                   # so recent live deals are re-checked with the fixed logic
+        state["last_run"] = {}               # and every search group is scanned on the next run
+        state["schema"] = 4
     alerts[:] = [a for a in alerts if time.time() - a["ts"] < ALERT_MAX_AGE_HOURS * 3600]
     for fn in (check_feeds, check_flight_feeds, check_flights, check_bestbuy,
                check_bestbuy_apple, check_bestbuy_appliances,
