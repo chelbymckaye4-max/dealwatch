@@ -1,7 +1,7 @@
 {
   "_help": "Edit values and commit. Percent values are minimum discount to alert. AMAZON_WATCHLIST: ASIN -> label. URL_WATCHLIST: product URL -> label.",
-  "PCT_THRESHOLD": 60,
-  "LUXURY_PCT_THRESHOLD": 60,
+  "PCT_THRESHOLD": 45,
+  "LUXURY_PCT_THRESHOLD": 45,
   "APPLE_PCT_THRESHOLD": 25,
   "BRAND_PCT_THRESHOLD": 50,
   "BESTBUY_PCT": 60,
