@@ -13,7 +13,7 @@ Sources:
 Env vars: NTFY_TOPIC, BESTBUY_KEY, KEEPA_KEY, SERPAPI_KEY, EBAY_CLIENT_ID/SECRET (all optional)
 Outputs : state.json (dedupe + price history), alerts.json (feeds the dashboard)
 """
-import base64, datetime, json, os, re, smtplib, ssl, statistics, time
+import base64, calendar, datetime, json, os, re, smtplib, ssl, statistics, time
 from email.message import EmailMessage
 from html import escape, unescape
 from urllib.parse import quote_plus, urljoin
@@ -314,8 +314,8 @@ build_search_feeds()
 
 
 # ---- Email digest (morning + evening) ---------------------------------------
-SMTP_HOST = os.environ.get("SMTP_HOST", "smtp.gmail.com")
-SMTP_PORT = int(os.environ.get("SMTP_PORT", "465"))
+SMTP_HOST = os.environ.get("SMTP_HOST") or "smtp.gmail.com"      # GitHub passes unset secrets as empty text, so use "or"
+SMTP_PORT = int(os.environ.get("SMTP_PORT") or "465")
 SMTP_USER = os.environ.get("SMTP_USER", "")
 SMTP_PASS = os.environ.get("SMTP_PASS", "")
 EMAIL_TO = os.environ.get("EMAIL_TO", "") or SMTP_USER
@@ -548,6 +548,21 @@ def fav_bar(title):
     hits = [pct for brand, pct in FAV_BRAND_PCT.items() if brand in t]
     return min(hits) if hits else None
 
+
+# ---- Keep it live: ignore old posts and expired deals -------------------------
+FEED_MAX_AGE_HOURS = 48         # ignore deal posts older than this
+FLIGHT_MAX_AGE_HOURS = 96       # flight deals last a bit longer
+ALERT_MAX_AGE_HOURS = 72        # alerts older than this are dropped from the app
+EXPIRED_RE = re.compile(r"\b(expired|sold out|out of stock|deal (?:has )?ended|no longer available|dead deal)\b", re.I)
+
+def entry_ts(e):
+    """When a feed post was published (unix time), or None."""
+    t = e.get("published_parsed") or e.get("updated_parsed")
+    try:
+        return calendar.timegm(t) if t else None
+    except Exception:
+        return None
+
 # ---- State ----------------------------------------------------------------
 def load(path, default):
     try:
@@ -597,9 +612,36 @@ def clean_query(title):
             "promo", "clip", "checkout", "lowest", "ever", "price", "error", "deal"}
     return " ".join([w for w in t.split() if w.lower() not in skip][:8])
 
+# Reads "$299.99 + $4.99 Shipping" correctly: ignores shipping, "$20 off", "$35+" thresholds, gift cards,
+# rebates and other extras, and tells the real price apart from the "was" price.
+PRICE_TOKEN = re.compile(r"\$\s?(\d{1,3}(?:,\d{3})+(?:\.\d{1,2})?|\d+(?:\.\d{1,2})?)")
+_ORIG_BEFORE = re.compile(r"(?:orig(?:inal)?\.?|was|reg(?:ular)?\.?|retail|msrp|list(?: price)?|value|compare(?: at)?|rrp)\W*$", re.I)
+_ORIG_AFTER = re.compile(r"^\s*(?:value|retail|msrp|list)\b", re.I)
+_BAD_BEFORE = re.compile(r"(?:\+|\boff|\bover|\bspend|\bof|\bmin(?:imum)?\.?|\bup to|\bsaves?|\bextra|\bgets?|\breceive|\bearn|\bcredit|\bwith a)\W*$", re.I)
+_BAD_AFTER = re.compile(
+    r"^(?:\+(?!\s)|\s*(?:shipping|s&h|handling|delivery|tax|\/mo|per month|monthly)\b|"
+    r"\s*(?:[\w'&-]+\s+){0,2}?(?:gift\s?card|e-?gift|credit|rebate|cash\s?back|rewards?|points|coupon)|"
+    r"\s*off\b|\s*(?:or more|and up|minimum|min\b))", re.I)
+
+def parse_prices(title):
+    """{'price': the item's price, 'original': the 'was' price} - either may be None."""
+    price = original = None
+    for m in PRICE_TOKEN.finditer(title):
+        val = float(m.group(1).replace(",", ""))
+        before, after = title[max(0, m.start() - 18):m.start()], title[m.end():m.end() + 30]
+        if _ORIG_BEFORE.search(before) or _ORIG_AFTER.search(after):
+            original = max(original or 0, val)
+            continue
+        if _BAD_BEFORE.search(before) or _BAD_AFTER.search(after):
+            continue
+        if price is None:
+            price = val
+    if price is not None and original is not None and original <= price * 1.05:
+        original = None
+    return {"price": price, "original": original}
+
 def title_cost(title):
-    prices = [float(x.replace(",", "")) for x in PRICE_RE.findall(title)]
-    return min(prices) if prices else None
+    return parse_prices(title)["price"]
 
 def resale_estimate(query, cost):
     """Rough profit if you flip the item, based on current eBay asking prices."""
@@ -824,9 +866,13 @@ def money(n):
     return f"-${abs(n)}" if n < 0 else f"${n}"
 
 def push(category, source, title, detail, url=None, urgent=False, pct=None,
-         cost=None, query=None, text="", image=None, images=None, credit=None):
+         cost=None, query=None, text="", image=None, images=None, credit=None, posted=None):
     est = resale_estimate(query, cost)
     deal_price = cost or title_cost(title)
+    was_price = parse_prices(title)["original"]
+    if not was_price:
+        wm = re.search(r"was \$([\d,]+(?:\.\d+)?)", detail or "")
+        was_price = float(wm.group(1).replace(",", "")) if wm else None
     cmp_ = None if category == "flights" else compare_prices(query or clean_query(title), deal_price)
     gallery = []
     for u in [image] + list(images or []):
@@ -859,9 +905,9 @@ def push(category, source, title, detail, url=None, urgent=False, pct=None,
     if cmp_ and cmp_["stores"]:
         find = "https://www.google.com/search?q=" + quote_plus(cmp_["stores"][0]["store"] + " promo code")
     print(f"[ALERT] {source}: {title} | {detail} | " + " | ".join(lines))
-    entry = {"ts": int(time.time()), "category": category, "source": source,
+    entry = {"ts": int(min(posted, time.time())) if posted else int(time.time()), "category": category, "source": source,
                       "title": title, "detail": detail, "url": url,
-                      "urgent": urgent, "pct": pct, "deal_price": deal_price,
+                      "urgent": urgent, "pct": pct, "deal_price": deal_price, "was_price": was_price,
                       "profit_ebay": est["ebay"] if est else None,
                       "profit_fb": est["fb"] if est else None,
                       "resale_median": est["median"] if est else None,
@@ -897,12 +943,15 @@ PRICE_RE = re.compile(r"\$\s?(\d{1,3}(?:,\d{3})*(?:\.\d{1,2})?|\d+(?:\.\d{1,2})?
 PCT_RE = re.compile(r"(\d{2,3})\s?%\s?off", re.I)
 
 def estimate_discount(title):
+    """% off from the title: price vs 'was' price, else an explicit '40% off'. Never guesses from stray amounts."""
+    pp = parse_prices(title)
+    if pp["price"] and pp["original"]:
+        pct = round((1 - pp["price"] / pp["original"]) * 100)
+        if 5 <= pct <= 90:
+            return pct
     m = PCT_RE.search(title)
-    if m:
+    if m and int(m.group(1)) <= 95 and not re.search(r"up to\s*$", title[max(0, m.start() - 8):m.start()], re.I):
         return int(m.group(1))
-    prices = [float(p.replace(",", "")) for p in PRICE_RE.findall(title)]
-    if len(prices) >= 2 and max(prices) > min(prices):
-        return round((1 - min(prices) / max(prices)) * 100)
     return None
 
 def home_unit_hit(title):
@@ -1018,6 +1067,11 @@ def check_feeds():
             continue
         for e in feed.entries[:40]:
             title, link = e.get("title", ""), e.get("link", "")
+            posted = entry_ts(e)
+            if posted and time.time() - posted > FEED_MAX_AGE_HOURS * 3600:
+                continue                         # old post (search feeds return old deals too)
+            if EXPIRED_RE.search(title + " " + (e.get("summary") or "")[:300]):
+                continue                         # marked expired / sold out
             if not title or already_seen(link or title):
                 continue
             pct = estimate_discount(title)
@@ -1055,7 +1109,7 @@ def check_feeds():
                      urgent=is_error or (pct or 0) >= 70, pct=pct,
                      cost=title_cost(title) if flip else None,
                      query=clean_query(title) if flip else None,
-                     text=e.get("summary", ""), images=entry_images(e))
+                     text=e.get("summary", ""), images=entry_images(e), posted=posted)
     for c, d in due.items():
         if d:
             last[c] = now
@@ -1357,7 +1411,10 @@ def check_flight_feeds():
             text = title + " " + e.get("summary", "")
             if not title or not TPA_RE.search(text) or DOMESTIC_RE.search(title):
                 continue
-            if already_seen(link or title):
+            posted = entry_ts(e)
+            if posted and time.time() - posted > FLIGHT_MAX_AGE_HOURS * 3600:
+                continue
+            if EXPIRED_RE.search(text[:400]) or already_seen(link or title):
                 continue
             err = bool(ERROR_WORDS.search(text))
             price = title_cost(title)
@@ -1365,7 +1422,7 @@ def check_flight_feeds():
                  (f"From ${price:.0f}. " if price else "") +
                  ("Possible mistake fare. " if err else "") +
                  "Layovers not verified, check before booking.",
-                 link, urgent=err, images=entry_images(e))
+                 link, urgent=err, images=entry_images(e), posted=posted)
 
 def _flight_ok(opt):
     lay = opt.get("layovers") or []
@@ -1684,6 +1741,10 @@ def apply_config():
 # ---- Run -------------------------------------------------------------------
 if __name__ == "__main__":
     apply_config()
+    if state.get("schema") != 3:             # one-time clean-up: earlier alerts used the old price reader
+        alerts.clear()
+        state["schema"] = 3
+    alerts[:] = [a for a in alerts if time.time() - a["ts"] < ALERT_MAX_AGE_HOURS * 3600]
     for fn in (check_feeds, check_flight_feeds, check_flights, check_bestbuy,
                check_bestbuy_apple, check_bestbuy_appliances,
                check_bestbuy_clearance, check_bestbuy_openbox, check_bestbuy_favorites, check_gmail_alerts, check_amazon, check_urls, check_outliers):

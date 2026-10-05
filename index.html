@@ -331,6 +331,7 @@
 
   var data = [], active = "all", sortMode = "hot";
   var filters = { verified: false, coupon: false };
+  var MAX_AGE_H = 72;   // hide deals older than this, so only live deals show
   var app = document.getElementById("app");
   var subText = "", updatedText = "";
 
@@ -376,7 +377,12 @@
     if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(text).then(done, fallback); } else { fallback(); }
     function fallback() { var t = document.createElement("textarea"); t.value = text; document.body.appendChild(t); t.select(); try { document.execCommand("copy"); } catch (e) {} document.body.removeChild(t); done(); }
   }
-  function strike(a) { return a.deal_price && a.market_median && a.market_median > a.deal_price * 1.05 ? a.market_median : null; }
+  function strike(a) {
+    if (!a.deal_price) return null;
+    if (a.market_median && a.market_median > a.deal_price * 1.05) return a.market_median;
+    if (a.was_price && a.was_price > a.deal_price * 1.05) return a.was_price;
+    return null;
+  }
 
   /* ---------- saved deals ---------- */
   function savedMap() { try { return JSON.parse(store.get("dw_saved") || "{}"); } catch (e) { return {}; } }
@@ -812,6 +818,7 @@
     fetch("alerts.json?t=" + Date.now(), { cache: "no-store" })
       .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
       .then(function (j) {
+        j = j.filter(function (a) { return Date.now() / 1000 - a.ts < MAX_AGE_H * 3600; });
         data = j; data.forEach(function (a) { a._id = idOf(a); });
         var hot = j.filter(function (a) { return a.urgent && Date.now() / 1000 - a.ts < 86400; }).length;
         subText = hot ? hot + " urgent deal" + (hot === 1 ? "" : "s") + " today" : "Nothing urgent today";
