@@ -16,7 +16,7 @@ Outputs : state.json (dedupe + price history), alerts.json (feeds the dashboard)
 import base64, calendar, collections, datetime, json, os, re, smtplib, ssl, statistics, time
 from email.message import EmailMessage
 from html import escape, unescape
-from urllib.parse import quote_plus, urljoin
+from urllib.parse import quote_plus, urljoin, urlparse
 import feedparser, requests
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -78,6 +78,7 @@ FEEDS = {
     "r/buildapcsales": ("https://www.reddit.com/r/buildapcsales/new/.rss", "electronics"),
     "r/deals": ("https://www.reddit.com/r/deals/new/.rss", "electronics"),
     "r/FrugalFemaleFashion": ("https://www.reddit.com/r/FrugalFemaleFashion/new/.rss", "fashion"),
+    "The Freebie Guy": ("https://thefreebieguy.com/feed/", "freebies"),
 }
 
 # ---- Home products (toilet paper, towels, bedding, cleaning, laundry) -------
@@ -216,7 +217,7 @@ FAKE_RE = re.compile(
     r"gold[- ]filled|fashion jewelry|stainless|brass|alloy|resin|zinc|cubic zirconia|\bcz\b|moissanite", re.I)
 JEWELRY_PCT_THRESHOLD = 40
 
-UNDERWEAR_RE = re.compile(r"underwear|panties|panty|\bthongs?\b|boy ?shorts?|hipsters?|bikini briefs?", re.I)
+UNDERWEAR_RE = re.compile(r"underwear|panties|panty|\bthongs?\b|boy ?shorts?|hipsters?|bikini briefs?|shapewear|body shaper|seamless briefs?", re.I)
 UNDERWEAR_PCT_THRESHOLD = 40
 
 APPLIANCE_RE = re.compile(
@@ -287,8 +288,8 @@ CLOTHING_SEARCH_TERMS = ["designer dress", "womens designer clothing", "theory w
 # How often each Slickdeals search group is checked (hours)
 THROTTLE_HOURS = {"home": 2, "shoes": 1, "cats": 2, "jewelry": 1, "underwear": 2,
                   "appliances": 1, "handbags": 1, "clothing": 1, "pets": 1,
-                  "decor": 2, "clearance": 1, "makeup": 1, "perfume": 1, "personalcare": 2, "favorites": 1}
-NO_RESALE = {"home", "flights", "jewelry", "underwear", "pets", "decor", "personalcare"}   # no eBay profit estimate for these
+                  "decor": 2, "clearance": 1, "makeup": 1, "perfume": 1, "personalcare": 2, "favorites": 1, "skincare": 2}
+NO_RESALE = {"home", "flights", "jewelry", "underwear", "pets", "decor", "personalcare", "skincare"}   # no eBay profit estimate for these
 
 def build_search_feeds():
     groups = {"home": HOME_SEARCH_TERMS, "shoes": SHOE_SEARCH_TERMS, "cats": CAT_SEARCH_TERMS,
@@ -301,6 +302,7 @@ def build_search_feeds():
               "makeup": globals().get("MAKEUP_SEARCH_TERMS", []),
               "perfume": globals().get("PERFUME_SEARCH_TERMS", []),
               "personalcare": globals().get("PERSONALCARE_SEARCH_TERMS", []),
+              "skincare": globals().get("SKINCARE_SEARCH_TERMS", []),
               "clothing": CLOTHING_SEARCH_TERMS}
     for k in [k for k in FEEDS if k.startswith("Slickdeals ")]:
         del FEEDS[k]
@@ -478,15 +480,16 @@ BEAUTY_BRANDS = [
     "issey miyake", "tory burch", "kayali", "sol de janeiro", "juliette has a gun", "ex nihilo",
     "penhaligon", "amouage", "atelier cologne", "acqua di parma", "frederic malle", "nest fragrances",
     "benefit cosmetics", "glow recipe", "drunk elephant", "tatcha", "sunday riley", "augustinus bader",
+    "e.l.f", "elf cosmetics", "maybelline", "lattafa",          # you buy these, so they're allowed
 ]
 # Anything with these terms is skipped (dupes, inspired-by, drugstore and mass-market lines)
 BEAUTY_EXCLUDE = [
     "dupe", "inspired by", "impression", "smells like", "smell like", "our version", "alternative to",
     "knock off", "knockoff", "designer inspired", "type fragrance", "fragrance oil", "body spray",
-    "body mist", "perfume oil", "unbranded", "generic", "e.l.f", "elf cosmetics", "maybelline",
+    "body mist", "perfume oil", "unbranded", "generic",
     "l'oreal", "loreal", "l\u2019or\u00e9al", "nyx", "revlon", "wet n wild", "milani", "covergirl",
-    "sephora collection", "essence", "colourpop", "nivea", "jovan", "axe", "avon", "bath & body",
-    "bath and body", "calvin klein", "adidas", "body fantasies", "lattafa", "armaf",
+    "sephora collection", "essence cosmetics", "colourpop", "nivea", "jovan", "axe", "avon", "bath & body",
+    "bath and body", "calvin klein", "adidas", "body fantasies", "armaf",
 ]
 MAKEUP_SEARCH_TERMS = ["charlotte tilbury", "dior makeup", "nars", "urban decay", "tarte", "fenty beauty",
                        "rare beauty", "too faced", "anastasia beverly hills", "hourglass", "makeup sale"]
@@ -495,6 +498,22 @@ PERFUME_SEARCH_TERMS = ["perfume", "eau de parfum", "designer perfume", "chanel 
 PERSONALCARE_SEARCH_TERMS = ["makeup remover wipes", "micellar wipes", "deodorant", "native deodorant",
                              "dove deodorant", "secret deodorant"]
 UNIT_TARGETS.update({"makeup_wipes_per_ct": 0.12, "deodorant_per_oz": 1.00})
+
+
+# ---- Skincare: K-beauty and the brands you buy ---------------------------------
+SKINCARE_PCT_THRESHOLD = 35
+SKINCARE_BRANDS = [
+    "aestura", "dr.althea", "dr. althea", "dr althea", "anua", "the face shop", "cerave", "good molecules",
+    "cosrx", "beauty of joseon", "round lab", "skin1004", "laneige", "innisfree", "medicube", "torriden",
+    "numbuzin", "sulwhasoo", "la roche-posay", "la mer", "drunk elephant", "tatcha", "sunday riley",
+    "glow recipe", "paula's choice", "augustinus bader",
+]
+SKINCARE_SEARCH_TERMS = ["anua", "cosrx", "dr althea", "aestura", "korean skincare", "cerave",
+                         "beauty of joseon", "laneige"]
+SKINCARE_RE = re.compile(r"serum|cream|cleanser|cleansing (oil|balm|foam)|moisturi[sz]er|sunscreen|sun cream|"
+                         r"sun stick|essence|toner|ampoule|face mask|sheet mask|eye cream|lotion|niacinamide|"
+                         r"retinol|vitamin c|peeling|exfoliat", re.I)
+SKINCARE_BRANDS_RE = None
 
 PERFUME_RE = re.compile(r"perfume|parfum|eau de (parfum|toilette|cologne)|cologne|\bedp\b|\bedt\b|fine fragrance|fragrance (set|gift)", re.I)
 MAKEUP_RE = re.compile(
@@ -509,6 +528,8 @@ def build_beauty_regex():
     global PREMIUM_BEAUTY_RE, CHEAP_BEAUTY_RE
     PREMIUM_BEAUTY_RE = re.compile(r"(?<![\w])(?:" + "|".join(re.escape(b) for b in BEAUTY_BRANDS) + r")(?![\w])", re.I)
     CHEAP_BEAUTY_RE = re.compile(r"(?<![\w])(?:" + "|".join(re.escape(b) for b in BEAUTY_EXCLUDE) + r")(?![\w])", re.I)
+    global SKINCARE_BRANDS_RE
+    SKINCARE_BRANDS_RE = re.compile(r"(?<![\w])(?:" + "|".join(re.escape(b) for b in SKINCARE_BRANDS) + r")(?![\w])", re.I)
 
 build_beauty_regex()
 
@@ -867,14 +888,14 @@ def money(n):
     return f"-${abs(n)}" if n < 0 else f"${n}"
 
 def push(category, source, title, detail, url=None, urgent=False, pct=None,
-         cost=None, query=None, text="", image=None, images=None, credit=None, posted=None, was=None):
+         cost=None, query=None, text="", image=None, images=None, credit=None, posted=None, was=None, quiet=False):
     est = resale_estimate(query, cost)
     deal_price = cost or title_cost(title)
     was_price = was or parse_prices(title)["original"]
     if not was_price:
         wm = re.search(r"was \$([\d,]+(?:\.\d+)?)", detail or "")
         was_price = float(wm.group(1).replace(",", "")) if wm else None
-    cmp_ = None if category == "flights" else compare_prices(query or clean_query(title), deal_price)
+    cmp_ = None if (category == "flights" or quiet) else compare_prices(query or clean_query(title), deal_price)
     gallery = []
     for u in [image] + list(images or []):
         u = good_image(u)
@@ -925,7 +946,7 @@ def push(category, source, title, detail, url=None, urgent=False, pct=None,
         entry["caution"] = "Very low for authentic beauty. Confirm the seller is authorized."
         lines.append("Caution: " + entry["caution"])
     alerts.insert(0, entry)
-    if not NTFY_TOPIC:
+    if not NTFY_TOPIC or quiet:
         return
     headers = {"Title": f"{title} ({source})".encode("utf-8"),
                "Priority": "5" if urgent else "4",
@@ -954,6 +975,56 @@ def estimate_discount(title):
     if m and int(m.group(1)) <= 95 and not re.search(r"up to\s*$", title[max(0, m.start() - 8):m.start()], re.I):
         return int(m.group(1))
     return None
+
+# ---- The Freebie Guy: daily deals + freebies, minus kids' and men's items ------
+FREEBIE_HOME_URL = "https://thefreebieguy.com/"
+FREEBIE_SKIP_SWEEPS = True          # sweepstakes / instant-win posts are skipped (set False to include them)
+KIDS_RE = re.compile(
+    r"\b(kids?|kid'?s|child(?:ren)?'?s?|toddlers?|infants?|babies|baby|newborns?|boys?|girls?|teens?|tweens?|"
+    r"preschool\w*|youth|toys?|lego|paw patrol|barbie|nursery|diapers?|strollers?|pacifiers?|"
+    r"school supplies|back to school|play ?sets?|trick-or-treat pails?)\b", re.I)
+MENS_ONLY_RE = re.compile(r"\b(men'?s|mens|man'?s|guys?|dads?|father'?s day|boxers?|boxer briefs|for him)\b", re.I)
+SWEEPS_RE = re.compile(r"\b(sweeps|sweepstakes|instant(?:ly)? win|iwg|giveaway|win cash|will win|winners?|enter to win)\b", re.I)
+
+def _homepage_entries(html):
+    """Fallback if the RSS feed is blocked: read the post titles, links, photos and dates off his homepage."""
+    entries = []
+    for m in re.finditer(r"<h2[^>]*>\s*<a[^>]+href=[\"']([^\"']+)[\"'][^>]*>(.*?)</a>", html, re.S | re.I):
+        link, title = m.group(1), unescape(re.sub(r"<[^>]+>", "", m.group(2))).strip()
+        before = html[max(0, m.start() - 900):m.start()]
+        imgs = re.findall(r"<img[^>]+src=[\"']([^\"']+)[\"']", before, re.I)
+        after = html[m.end():m.end() + 500]
+        dm = re.search(r"([A-Z][a-z]+ \d{1,2}, \d{4})", re.sub(r"<[^>]+>", " ", after))
+        ts = None
+        if dm:
+            try:
+                ts = datetime.datetime.strptime(dm.group(1), "%B %d, %Y").replace(tzinfo=datetime.timezone.utc).timetuple()
+            except ValueError:
+                pass
+        if title and link:
+            entries.append({"title": title, "link": link, "published_parsed": ts,
+                            "summary": f'<img src="{imgs[-1]}">' if imgs else ""})
+    return entries
+
+def freebie_entries(feed_url):
+    """The Freebie Guy's posts: RSS first, homepage as a backup."""
+    try:
+        r = requests.get(feed_url, headers=UA, timeout=20)
+        if r.status_code == 200:
+            ents = feedparser.parse(r.content).entries
+            if ents:
+                return ents
+        print(f"freebie guy feed: HTTP {r.status_code} or empty, trying the homepage")
+    except Exception as e:
+        print("freebie guy feed error:", e)
+    try:
+        r = requests.get(FREEBIE_HOME_URL, headers=UA, timeout=20)
+        if r.status_code == 200:
+            return _homepage_entries(r.text)
+        print(f"freebie guy homepage: HTTP {r.status_code}")
+    except Exception as e:
+        print("freebie guy homepage error:", e)
+    return []
 
 def deal_discount(title, summary=""):
     """(pct off, 'was' price). Also looks in the post summary for a 'was' price when the title has only a price."""
@@ -998,6 +1069,8 @@ def classify(title, summary, feed_cat):
     mens = bool(MENS_RE.search(title)) and not WOMENS_RE.search(title)
     electronics = bool(ELECTRONICS_RE.search(title))
     luxury = bool(LUXURY_BRANDS.search(title) or DESIGNER_RE.search(title))
+    if feed_cat == "freebies" and (KIDS_RE.search(title) or (MENS_ONLY_RE.search(title) and not WOMENS_RE.search(title))):
+        return None                          # no children's or men's items
     if feed_cat == "home":
         return "home", HOME_PCT_THRESHOLD, ""
     if (feed_cat == "shoes" or SHOE_RE.search(title)) and not electronics:
@@ -1008,15 +1081,20 @@ def classify(title, summary, feed_cat):
             return None
         note = "Size " + "/".join(f"{x:g}" for x in SHOE_SIZES) + (": listed" if size == "ok" else ": not stated, check")
         return "shoes", min(PCT_THRESHOLD, SHOE_PCT_THRESHOLD), note
-    beauty_kw = bool(PERFUME_RE.search(title) or MAKEUP_RE.search(title) or WIPES_RE.search(title) or DEOD_RE.search(title))
-    if (feed_cat in ("makeup", "perfume", "personalcare") or
+    skin_hit = bool(SKINCARE_RE.search(title) and SKINCARE_BRANDS_RE and SKINCARE_BRANDS_RE.search(title))
+    beauty_kw = bool(PERFUME_RE.search(title) or MAKEUP_RE.search(title) or WIPES_RE.search(title) or DEOD_RE.search(title) or skin_hit)
+    if (feed_cat in ("makeup", "perfume", "personalcare", "skincare") or
             (beauty_kw and feed_cat not in ("pets", "cats", "appliances", "jewelry", "clothing", "handbags", "shoes"))) and not electronics:
         if WIPES_RE.search(title) or DEOD_RE.search(title) or feed_cat == "personalcare":
             if mens:
                 return None
             return "personalcare", PERSONALCARE_PCT_THRESHOLD, ""
+        if skin_hit and not (PERFUME_RE.search(title) or MAKEUP_RE.search(title)):
+            return None if CHEAP_BEAUTY_RE.search(title) else ("skincare", SKINCARE_PCT_THRESHOLD, "")
+        if feed_cat == "skincare":
+            return None
         if CHEAP_BEAUTY_RE.search(title) or not PREMIUM_BEAUTY_RE.search(title):
-            return None                      # premium brands only; no dupes or drugstore lines
+            return None                      # allowed brands only; no dupes or mass-market lines
         if PERFUME_RE.search(title):
             return "perfume", PERFUME_PCT_THRESHOLD, ""
         return "makeup", MAKEUP_PCT_THRESHOLD, ""
@@ -1070,21 +1148,27 @@ def check_feeds():
     for name, (url, cat) in FEEDS.items():
         if cat in due and not due[cat]:
             continue
-        try:
-            resp = requests.get(url, headers=UA, timeout=20)
-            if cat in THROTTLE_HOURS:
-                time.sleep(0.4)                  # be polite to search feeds
-            if resp.status_code != 200:
-                print(f"feed {name}: HTTP {resp.status_code} (some sites block cloud servers; see README)")
+        if cat == "freebies":
+            entries = freebie_entries(url)
+            STATS["feeds_read" if entries else "feeds_blocked"] += 1
+            if not entries:
+                continue
+        else:
+            try:
+                resp = requests.get(url, headers=UA, timeout=20)
+                if cat in THROTTLE_HOURS:
+                    time.sleep(0.4)                  # be polite to search feeds
+                if resp.status_code != 200:
+                    print(f"feed {name}: HTTP {resp.status_code} (some sites block cloud servers; see README)")
+                    STATS["feeds_blocked"] += 1
+                    continue
+                entries = feedparser.parse(resp.content).entries
+                STATS["feeds_read"] += 1
+            except Exception as e:
+                print(f"feed error {name}: {e}")
                 STATS["feeds_blocked"] += 1
                 continue
-            feed = feedparser.parse(resp.content)
-            STATS["feeds_read"] += 1
-        except Exception as e:
-            print(f"feed error {name}: {e}")
-            STATS["feeds_blocked"] += 1
-            continue
-        for e in feed.entries[:40]:
+        for e in entries[:40]:
             title, link = e.get("title", ""), e.get("link", "")
             STATS["posts"] += 1
             posted = entry_ts(e)
@@ -1097,6 +1181,11 @@ def check_feeds():
             if not title or already_seen(link or title):
                 STATS["already_seen"] += 1
                 continue
+            if cat == "freebies":                # also check the post's web address ("...-kids-workshop", "...-mens-boots")
+                slug = urlparse(link).path.replace("-", " ")
+                if KIDS_RE.search(slug) or (MENS_ONLY_RE.search(slug) and not WOMENS_RE.search(slug)):
+                    STATS["kids_mens_skipped"] += 1
+                    continue
             pct, was = deal_discount(title, e.get("summary", ""))
             is_error = bool(ERROR_WORDS.search(title))
             res = classify(title, e.get("summary", ""), cat)
@@ -1120,22 +1209,33 @@ def check_feeds():
             unit_hit = (home_unit_hit(title) if category == "home"
                         else pet_unit_hit(title) if category == "pets"
                         else care_unit_hit(title) if category == "personalcare" else None)
-            if is_error or unit_hit or (pct is not None and pct >= bar):
+            qualifies = bool(is_error or unit_hit or (pct is not None and pct >= bar))
+            quiet = False
+            if cat == "freebies":
+                if FREEBIE_SKIP_SWEEPS and SWEEPS_RE.search(title):
+                    STATS["sweeps_skipped"] += 1
+                    continue
+                quiet = not qualifies            # listed in the app, but only pushed if it also beats your bar
+                qualifies = True
+            if qualifies:
                 if is_error:
                     detail = "Possible price error"
                 elif unit_hit:
                     detail = (f"${unit_hit[0]:.2f} per {unit_hit[1]}" + (f" ({pct}% off)" if pct else "")
                               + (" | stock-up price" if unit_hit[2] <= 0.8 else ""))
-                else:
+                elif pct is not None:
                     detail = f"{pct}% off"
+                else:
+                    detail = "Free" if re.search(r"\bfree\b", title, re.I) else "New deal"
                 if note:
                     detail += " | " + note
-                flip = category not in NO_RESALE
+                flip = category not in NO_RESALE and not quiet
                 push(category, name, title, detail, link,
                      urgent=is_error or (pct or 0) >= 70, pct=pct,
                      cost=title_cost(title) if flip else None,
                      query=clean_query(title) if flip else None,
-                     text=e.get("summary", ""), images=entry_images(e), posted=posted, was=was)
+                     text=e.get("summary", ""), images=entry_images(e), posted=posted, was=was,
+                     quiet=quiet)
                 STATS["alerted"] += 1
             else:
                 STATS["below_your_bar"] += 1

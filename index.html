@@ -303,6 +303,7 @@
     shirt: '<path d="M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.47a1 1 0 0 0 .99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.47a2 2 0 0 0-1.34-2.23z"/>',
     sofa: '<path d="M20 9V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v3"/><path d="M2 11v5a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-5a2 2 0 0 0-4 0v2H6v-2a2 2 0 0 0-4 0z"/><path d="M4 18v2M20 18v2"/>',
     paw: '<circle cx="6" cy="10" r="2"/><circle cx="10" cy="5.5" r="2"/><circle cx="14" cy="5.5" r="2"/><circle cx="18" cy="10" r="2"/><path d="M12 11c-3 0-5.5 3-5.5 5.5 0 2 1.5 2.5 3 2.5 1 0 1.5-.5 2.5-.5s1.5.5 2.5.5c1.5 0 3-.5 3-2.5C17.5 14 15 11 12 11z"/>',
+    gift: '<path d="M20 12v10H4V12"/><path d="M2 7h20v5H2z"/><path d="M12 22V7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/>',
     sparkle: '<path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/><path d="M20 3v4M22 5h-4M4 17v2M5 18H3"/>',
     tag: '<path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/><circle cx="7.5" cy="7.5" r=".5"/>',
     menu: '<path d="M4 6h16M4 12h16M4 18h10"/>',
@@ -319,9 +320,10 @@
     {id:"travel",   name:"Travel",            icon:"plane",   cats:[["flights","Flights"]]},
     {id:"tech",     name:"Tech & Apple",      icon:"laptop",  cats:[["apple","Apple"],["electronics","Electronics"]]},
     {id:"clothing", name:"Clothing & Style",  icon:"shirt",   cats:[["clothing","Clothing"],["shoes","Shoes"],["handbags","Handbags"],["jewelry","Jewelry"],["underwear","Underwear"],["fashion","Designer finds"]]},
-    {id:"beauty",   name:"Beauty & Care",     icon:"sparkle", cats:[["perfume","Perfume"],["makeup","Makeup"],["personalcare","Wipes & deodorant"]]},
+    {id:"beauty",   name:"Beauty & Care",     icon:"sparkle", cats:[["perfume","Perfume"],["makeup","Makeup"],["skincare","Skincare"],["personalcare","Wipes & deodorant"]]},
     {id:"home",     name:"Home & Appliances", icon:"sofa",    cats:[["appliances","Appliances"],["decor","Decor"]]},
     {id:"pets",     name:"Pets & Household",  icon:"paw",     cats:[["pets","Pet food & litter"],["cats","Cat furniture"],["home","Household staples"]]},
+    {id:"freebies", name:"Freebies & Deals",  icon:"gift",    cats:[["freebies","Freebie Guy picks"]]},
     {id:"amazon",   name:"Amazon & Watchlist",icon:"tag",     cats:[["amazon","Amazon"],["watchlist","Your watchlist"]]}
   ];
   var CAT_GROUP = {};
@@ -444,13 +446,14 @@
     var c = el("article", "pc"), link = el("a"); link.href = "#/deal/" + a._id;
     var im = photo(a, "pc-img", g.icon), badges = el("div", "badges");
     if (a.pct) badges.appendChild(el("span", "pill off", "\u2212" + a.pct + "%"));
+    else if (/\bfree\b/i.test(a.title)) badges.appendChild(el("span", "pill ok", "FREE"));
     if (a.verified) badges.appendChild(el("span", "pill ok", "Verified"));
     im.appendChild(badges); link.appendChild(im);
     var b = el("div", "pc-b");
     b.appendChild(el("div", "nm", a.title));
     var pr = el("div", "pr");
     if (a.deal_price) { pr.appendChild(document.createTextNode(money(a.deal_price))); var s = strike(a); if (s) pr.appendChild(el("s", null, money(s))); }
-    else { pr.textContent = a.pct ? a.pct + "% off" : "Deal"; }
+    else { pr.textContent = a.pct ? a.pct + "% off" : (/\bfree\b/i.test(a.title) ? "Free" : "See deal"); }
     b.appendChild(pr);
     b.appendChild(el("div", "mt", src(a.source) + " \u2022 " + ago(a.ts)));
     if (a.style_terms && a.style_terms.length) b.appendChild(el("div", "mt style", "Matches your style: " + a.style_terms.map(tcase).join(", ")));
