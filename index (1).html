@@ -1,0 +1,860 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Dealwatch</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="theme-color" content="#ecebe8">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Dealwatch">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400..700&family=Instrument+Serif&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #ecebe8; --tile: #e0deda; --card: #f6f5f2; --ink: #1f1f1e; --muted: #8b8a86; --line: #d9d7d2;
+    --dark: #1c1c1b; --on-dark: #ffffff; --off-bg: #f4d5cc; --off-ink: #b8452f; --ok-bg: #2f5d4a; --ok-ink: #ffffff;
+    --heart: #e5484d; --bar: rgba(246,245,242,.9);
+    box-sizing: border-box; padding-top: env(safe-area-inset-top, 0px);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #121211; --tile: #232321; --card: #1b1b1a; --ink: #f3f2ef; --muted: #9a9995; --line: #2c2c2a;
+      --dark: #f3f2ef; --on-dark: #121211; --off-bg: #4a2a22; --off-ink: #f2a595; --ok-bg: #3d7a62; --ok-ink: #ffffff;
+      --heart: #ff6b70; --bar: rgba(27,27,26,.9);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #121211; --tile: #232321; --card: #1b1b1a; --ink: #f3f2ef; --muted: #9a9995; --line: #2c2c2a;
+    --dark: #f3f2ef; --on-dark: #121211; --off-bg: #4a2a22; --off-ink: #f2a595; --ok-bg: #3d7a62; --ok-ink: #ffffff;
+    --heart: #ff6b70; --bar: rgba(27,27,26,.9);
+  }
+  * { box-sizing: border-box; }
+  html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+  body { margin: 0; background: var(--bg); color: var(--ink); font-family: "DM Sans", system-ui, -apple-system, "Segoe UI", sans-serif; line-height: 1.35; -webkit-font-smoothing: antialiased; }
+  main { max-width: 640px; margin: 0 auto; padding: 14px 16px calc(112px + env(safe-area-inset-bottom, 0px)); }
+  button, a { -webkit-tap-highlight-color: transparent; font-family: inherit; }
+  button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+  #banner:not(:empty) { background: var(--dark); color: var(--on-dark); font-weight: 600; font-size: 13px; text-align: center; padding: 6px 12px; }
+  .svgi { display: inline-grid; place-items: center; }
+  .svgi svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .svgi.on svg { fill: currentColor; }
+
+  /* header */
+  .head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .head .brand { font-size: 26px; font-weight: 600; letter-spacing: -0.03em; }
+  .head .l, .head .r { display: flex; align-items: center; gap: 10px; }
+  .head .l { flex: 1; }
+  .head .r { justify-content: flex-end; }
+  .ib { border: 0; background: none; color: var(--ink); padding: 6px; cursor: pointer; text-decoration: none; display: inline-grid; place-items: center; position: relative; }
+  .circ { width: 44px; height: 44px; border-radius: 50%; background: var(--card); box-shadow: 0 1px 2px rgba(0,0,0,.08); border: 0; color: var(--ink); display: inline-grid; place-items: center; cursor: pointer; text-decoration: none; }
+  .circ.on { color: var(--heart); }
+  .sub { color: var(--muted); font-size: 13px; font-weight: 500; margin: -6px 0 14px; }
+  .ptitle { font-size: 30px; font-weight: 600; letter-spacing: -0.03em; margin: 4px 0 4px; line-height: 1.1; }
+  .psub { color: var(--muted); font-size: 14px; margin: 0 0 12px; }
+  .pbar { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+
+  /* sections */
+  .sh { display: flex; align-items: baseline; justify-content: space-between; margin: 26px 0 12px; }
+  .sh h3 { margin: 0; font-size: 20px; font-weight: 600; letter-spacing: -0.02em; }
+  .sh a { color: var(--muted); font-size: 14px; font-weight: 500; text-decoration: none; }
+
+  /* banner carousel */
+  .bn-wrap { position: relative; }
+  .bn-track { display: flex; gap: 12px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; margin: 0 -16px; padding: 0 16px; scroll-padding: 0 16px; }
+  .bn-track::-webkit-scrollbar { display: none; }
+  .bn { flex: none; width: 100%; scroll-snap-align: center; position: relative; min-height: 204px; border-radius: 26px; background: var(--tile); overflow: hidden; padding: 20px; display: flex; align-items: center; color: inherit; text-decoration: none; }
+  .bn .txt { position: relative; z-index: 1; width: 58%; }
+  .bn .kick { font-size: 13px; color: var(--muted); font-weight: 600; }
+  .bn h2 { margin: 4px 0 6px; font-size: 21px; line-height: 1.15; font-weight: 600; letter-spacing: -0.02em; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .bn .pr { font-size: 15px; font-weight: 600; margin-bottom: 12px; }
+  .bn .bi { position: absolute; right: 0; top: 0; bottom: 0; width: 52%; display: grid; place-items: center; color: var(--muted); }
+  .bn .bi img { width: 100%; height: 100%; object-fit: cover; -webkit-mask-image: linear-gradient(to right, transparent, #000 38%); mask-image: linear-gradient(to right, transparent, #000 38%); }
+  .bn .bi .svgi svg { width: 64px; height: 64px; opacity: .5; }
+  .dots { position: absolute; left: 20px; bottom: 14px; display: flex; gap: 6px; z-index: 2; }
+  .dots i { width: 6px; height: 6px; border-radius: 50%; background: rgba(120,120,115,.4); }
+  .dots i.on { background: var(--ink); }
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: 0; background: var(--dark); color: var(--on-dark); font: inherit; font-size: 14px; font-weight: 600; padding: 11px 18px; border-radius: 999px; cursor: pointer; text-decoration: none; }
+  .btn.ghost { background: transparent; color: var(--ink); box-shadow: inset 0 0 0 1.5px var(--line); }
+  .btn.block { width: 100%; padding: 15px 18px; font-size: 15px; }
+
+  /* category row */
+  .cats { display: flex; gap: 14px; overflow-x: auto; margin: 0 -16px; padding: 0 16px 4px; scrollbar-width: none; }
+  .cats::-webkit-scrollbar { display: none; }
+  a.ct { flex: none; width: 80px; text-align: center; text-decoration: none; color: inherit; }
+  .ct .ci, .bg .ci { background: var(--tile); border-radius: 18px; display: grid; place-items: center; overflow: hidden; color: var(--muted); }
+  .ct .ci { width: 80px; height: 80px; }
+  .ct .ci img, .bg .ci img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .ct .nm { font-size: 12px; font-weight: 500; margin-top: 7px; line-height: 1.2; }
+  .ct.zero, .bg.zero { opacity: .55; }
+
+  /* product grid */
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .pc { position: relative; background: var(--card); border-radius: 22px; overflow: hidden; }
+  .pc > a { display: block; color: inherit; text-decoration: none; }
+  .pc-img { position: relative; aspect-ratio: 1 / 0.92; background: var(--tile); display: grid; place-items: center; color: var(--muted); }
+  .pc-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .pc-img .svgi svg { width: 44px; height: 44px; opacity: .55; }
+  .badges { position: absolute; left: 10px; top: 10px; display: flex; flex-direction: column; gap: 5px; align-items: flex-start; }
+  .pill { display: inline-block; font-size: 11.5px; font-weight: 700; padding: 3px 9px; border-radius: 999px; line-height: 1.3; }
+  .pill.off { background: var(--off-bg); color: var(--off-ink); }
+  .pill.ok { background: var(--ok-bg); color: var(--ok-ink); }
+  .pill.warn { background: var(--tile); color: var(--muted); }
+  .pc .heart { position: absolute; right: 8px; top: 8px; width: 34px; height: 34px; border-radius: 50%; border: 0; background: rgba(255,255,255,.78); color: #3a3a38; display: grid; place-items: center; cursor: pointer; }
+  .pc .heart.on { color: var(--heart); }
+  .pc .heart .svgi svg { width: 19px; height: 19px; }
+  .pc-b { padding: 10px 12px 14px; }
+  .pc-b .nm { font-size: 14px; font-weight: 500; line-height: 1.25; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 35px; }
+  .pc-b .pr { margin-top: 6px; font-size: 17px; font-weight: 700; letter-spacing: -0.01em; }
+  .pc-b .pr s { color: var(--muted); font-size: 13px; font-weight: 500; margin-left: 6px; }
+  .pc-b .mt { margin-top: 3px; color: var(--muted); font-size: 12px; font-weight: 500; }
+
+  /* chips */
+  .chips { display: flex; gap: 8px; overflow-x: auto; margin: 4px -16px 14px; padding: 0 16px; scrollbar-width: none; }
+  .chips::-webkit-scrollbar { display: none; }
+  a.chip { flex: none; background: var(--card); color: var(--ink); font-size: 14px; font-weight: 500; padding: 8px 15px; border-radius: 999px; text-decoration: none; white-space: nowrap; }
+  a.chip[aria-current="true"] { background: var(--dark); color: var(--on-dark); }
+  a.chip.zero { color: var(--muted); }
+
+  /* browse tiles */
+  .bgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  a.bg { display: block; color: inherit; text-decoration: none; background: var(--card); border-radius: 22px; padding: 10px 10px 14px; }
+  .bg .ci { width: 100%; aspect-ratio: 1 / .78; border-radius: 16px; }
+  .bg .nm { font-size: 15px; font-weight: 600; margin: 10px 4px 0; letter-spacing: -0.01em; }
+  .bg .ct2 { font-size: 12.5px; color: var(--muted); margin: 2px 4px 0; font-weight: 500; }
+  .ci .svgi svg { width: 34px; height: 34px; opacity: .6; }
+
+  /* search */
+  .sbox { display: flex; align-items: center; gap: 10px; background: var(--card); border-radius: 999px; padding: 0 16px; height: 48px; flex: 1; }
+  .sbox input { flex: 1; border: 0; background: none; font: inherit; font-size: 16px; color: var(--ink); outline: none; min-width: 0; }
+  .sbox .svgi { color: var(--muted); }
+
+  /* detail */
+  .gal { position: relative; margin: -14px -16px 0; }
+  .gal-track { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; }
+  .gal-track::-webkit-scrollbar { display: none; }
+  .gal-slide { flex: none; width: 100%; scroll-snap-align: center; aspect-ratio: 1 / 1.05; max-height: 62vh; background: var(--tile); display: grid; place-items: center; color: var(--muted); }
+  .gal-slide img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .gal-slide .svgi svg { width: 72px; height: 72px; opacity: .5; }
+  .gal .tl { position: absolute; left: 16px; top: 14px; }
+  .gal .tr { position: absolute; right: 16px; top: 14px; }
+  .gal .dots { left: 50%; transform: translateX(-50%); bottom: 14px; }
+  .gal .dots i { background: rgba(255,255,255,.6); box-shadow: 0 0 0 1px rgba(0,0,0,.12); }
+  .gal .dots i.on { background: #fff; }
+  .gal .cap { position: absolute; right: 16px; bottom: 12px; font-size: 11px; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.5); font-weight: 600; }
+  .d-body { padding-top: 16px; }
+  .d-title { font-size: 22px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.2; margin: 0; }
+  .d-price { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 10px 0 4px; }
+  .d-price b { font-size: 30px; font-weight: 700; letter-spacing: -0.03em; }
+  .d-price s { color: var(--muted); font-size: 16px; }
+  .d-note { color: var(--muted); font-size: 14px; margin: 4px 0 0; font-weight: 500; }
+  .blk { background: var(--card); border-radius: 20px; padding: 14px 16px; margin-top: 12px; }
+  .blk h4 { margin: 0 0 8px; font-size: 15px; font-weight: 600; }
+  .blk p { margin: 6px 0; font-size: 13.5px; color: var(--muted); font-weight: 500; }
+  .code { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .code code { font-family: ui-monospace, Menlo, monospace; font-size: 16px; font-weight: 700; padding: 5px 12px; border-radius: 10px; border: 1.5px dashed var(--muted); }
+  .ladder { display: grid; gap: 12px; }
+  .lr { display: block; color: inherit; text-decoration: none; }
+  .lr .line { display: flex; justify-content: space-between; gap: 10px; font-size: 14px; font-weight: 500; }
+  .lr .line b { font-weight: 700; }
+  .lr .line em { font-style: normal; color: var(--muted); font-size: 12.5px; margin-left: 8px; }
+  .bar { height: 7px; border-radius: 99px; background: var(--tile); margin-top: 5px; overflow: hidden; }
+  .bar i { display: block; height: 100%; border-radius: 99px; background: var(--muted); opacity: .6; }
+  .lr.you .bar i { background: var(--ink); opacity: 1; }
+  .lr.you .line { font-weight: 700; }
+  .cta { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; padding: 12px 16px calc(14px + env(safe-area-inset-bottom, 0px)); background: var(--bar); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
+  .cta .in { max-width: 640px; margin: 0 auto; display: flex; gap: 10px; }
+  .cta .in .btn:first-child { flex: 1; }
+
+  /* checkout */
+  .panel { background: var(--card); border-radius: 22px; padding: 16px; margin-top: 12px; }
+  .panel h3 { margin: 0 0 6px; font-size: 16px; font-weight: 600; }
+  .panel textarea { width: 100%; font: inherit; font-size: 15px; color: var(--ink); background: var(--bg); border: 1.5px solid var(--line); border-radius: 14px; padding: 12px; resize: vertical; }
+  .hint { color: var(--muted); font-size: 13px; margin: 8px 0; font-weight: 500; }
+  .row2 { display: flex; gap: 8px; margin: 10px 0; }
+  .empty { padding: 40px 18px; color: var(--muted); text-align: center; font-weight: 500; background: var(--card); border-radius: 22px; grid-column: 1 / -1; }
+  .refresh { display: flex; justify-content: space-between; align-items: center; margin-top: 22px; color: var(--muted); font-size: 13px; font-weight: 500; }
+  .refresh button { background: none; border: 0; color: var(--ink); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; text-decoration: underline; }
+
+  /* filter button + sheet */
+  .fab { position: fixed; right: 16px; bottom: calc(92px + env(safe-area-inset-bottom, 0px)); z-index: 20; width: 54px; height: 54px; border-radius: 50%; border: 0; background: var(--dark); color: var(--on-dark); display: none; place-items: center; box-shadow: 0 8px 22px rgba(0,0,0,.28); cursor: pointer; }
+  .fab .svgi svg { width: 24px; height: 24px; }
+  .sheet-bg { position: fixed; inset: 0; z-index: 60; background: rgba(0,0,0,.4); display: none; align-items: flex-end; }
+  .sheet-bg.open { display: flex; }
+  .sheet { width: 100%; max-width: 640px; margin: 0 auto; background: var(--card); border-radius: 26px 26px 0 0; padding: 18px 18px calc(22px + env(safe-area-inset-bottom, 0px)); }
+  .sheet h3 { margin: 0 0 12px; font-size: 18px; font-weight: 600; }
+  .seg { display: inline-flex; background: var(--tile); border-radius: 999px; padding: 3px; margin-bottom: 14px; }
+  .seg button { border: 0; background: none; color: var(--muted); font: inherit; font-size: 14px; font-weight: 600; padding: 8px 18px; border-radius: 999px; cursor: pointer; }
+  .seg button[aria-pressed="true"] { background: var(--dark); color: var(--on-dark); }
+  .tgl { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-top: 1px solid var(--line); font-size: 15px; font-weight: 500; }
+  .tgl button { width: 46px; height: 28px; border-radius: 99px; border: 0; background: var(--tile); position: relative; cursor: pointer; }
+  .tgl button::after { content: ""; position: absolute; left: 3px; top: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.3); transition: transform .15s; }
+  .tgl button[aria-pressed="true"] { background: var(--ok-bg); }
+  .tgl button[aria-pressed="true"]::after { transform: translateX(18px); }
+  @media (prefers-reduced-motion: reduce) { .tgl button::after { transition: none; } }
+
+  /* tab bar */
+  .tabbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 25; background: var(--bar); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); padding: 8px 8px calc(8px + env(safe-area-inset-bottom, 0px)); }
+  .tabbar nav { display: flex; max-width: 640px; margin: 0 auto; }
+  .tabbar a { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 6px 0; color: var(--muted); text-decoration: none; font-size: 11.5px; font-weight: 500; position: relative; }
+  .tabbar a[aria-current="page"] { color: var(--ink); font-weight: 700; }
+  .tabbar .bd { position: absolute; top: 0; left: calc(50% + 6px); background: var(--dark); color: var(--on-dark); font-size: 10px; font-weight: 700; min-width: 16px; height: 16px; border-radius: 99px; display: grid; place-items: center; padding: 0 4px; }
+  body.no-tabs .tabbar { display: none; }
+  body.no-tabs main { padding-bottom: calc(110px + env(safe-area-inset-bottom, 0px)); }
+
+  .d-head { display: flex; justify-content: space-between; align-items: baseline; gap: 14px; margin-top: 4px; }
+  .drow { display: flex; justify-content: space-between; gap: 16px; padding: 14px 0; border-top: 1px solid var(--line); font-size: 14px; align-items: center; }
+  .drow .k { font-size: 13px; }
+  .drow .v { font-weight: 500; text-align: right; }
+  .pc-b .mt.style { color: var(--ink); font-weight: 600; }
+  /* ===== Boutique look: editorial, ivory, serif ===== */
+  :root[data-look="boutique"] {
+    --bg: #fdfbf3; --tile: #e8e5dc; --card: #fdfbf3; --ink: #1b1b1a; --muted: #7f7d74; --line: #d8d5c9;
+    --dark: #1b1b1a; --on-dark: #ffffff; --off-bg: #c8282b; --off-ink: #ffffff; --ok-bg: #1b1b1a; --ok-ink: #ffffff;
+    --heart: #1b1b1a; --bar: rgba(253,251,243,.95); --accent: #c8282b;
+    --display: "Instrument Serif", "Cormorant Garamond", Georgia, serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root[data-look="boutique"]:not([data-theme="light"]) {
+      --bg: #151512; --tile: #26241f; --card: #151512; --ink: #f6f2e7; --muted: #a29f94; --line: #34322b;
+      --dark: #f6f2e7; --on-dark: #151512; --off-bg: #e0534f; --ok-bg: #f6f2e7; --ok-ink: #151512;
+      --heart: #f6f2e7; --bar: rgba(21,21,18,.95); --accent: #e0534f;
+    }
+  }
+  :root[data-look="boutique"][data-theme="dark"] {
+    --bg: #151512; --tile: #26241f; --card: #151512; --ink: #f6f2e7; --muted: #a29f94; --line: #34322b;
+    --dark: #f6f2e7; --on-dark: #151512; --off-bg: #e0534f; --ok-bg: #f6f2e7; --ok-ink: #151512;
+    --heart: #f6f2e7; --bar: rgba(21,21,18,.95); --accent: #e0534f;
+  }
+  :root[data-look="boutique"] .head .brand { font-family:var(--display);font-weight:400;font-size:32px;letter-spacing:-.01em }
+  :root[data-look="boutique"] .ptitle { font-family:var(--display);font-weight:400;font-size:42px;letter-spacing:-.01em }
+  :root[data-look="boutique"] .sh h3, :root[data-look="boutique"] .bg .nm, :root[data-look="boutique"] .blk h4, :root[data-look="boutique"] .panel h3, :root[data-look="boutique"] .sheet h3 { font-family:var(--display);font-weight:400 }
+  :root[data-look="boutique"] .sh h3 { font-size:28px }
+  :root[data-look="boutique"] .bg .nm { font-size:21px }
+  :root[data-look="boutique"] .blk h4, :root[data-look="boutique"] .panel h3, :root[data-look="boutique"] .sheet h3 { font-size:21px }
+  :root[data-look="boutique"] .pc, :root[data-look="boutique"] .pc-img, :root[data-look="boutique"] .bn, :root[data-look="boutique"] .btn, :root[data-look="boutique"] .pill, :root[data-look="boutique"] a.chip, :root[data-look="boutique"] a.bg, :root[data-look="boutique"] .bg .ci, :root[data-look="boutique"] .blk, :root[data-look="boutique"] .panel, :root[data-look="boutique"] .empty, :root[data-look="boutique"] .sheet, :root[data-look="boutique"] .panel textarea, :root[data-look="boutique"] .code code, :root[data-look="boutique"] .seg, :root[data-look="boutique"] .seg button, :root[data-look="boutique"] .sbox { border-radius:0 }
+  :root[data-look="boutique"] .pc { background:none }
+  :root[data-look="boutique"] .pc-img { aspect-ratio:1 / 1.1 }
+  :root[data-look="boutique"] .pc-b { padding:8px 2px 14px }
+  :root[data-look="boutique"] .pc-b .nm { font-family:var(--display);font-size:19px;font-weight:400;line-height:1.1;min-height:42px }
+  :root[data-look="boutique"] .pc-b .pr { font-size:14px;font-weight:500;margin-top:5px }
+  :root[data-look="boutique"] .pc-b .pr s { font-size:12px }
+  :root[data-look="boutique"] .pc .heart { background:none;color:var(--ink);top:6px;right:6px }
+  :root[data-look="boutique"] .circ { background:rgba(253,251,243,.78);box-shadow:none }
+  :root[data-look="boutique"] .circ.on { color:var(--ink) }
+  :root[data-look="boutique"] .pill { font-size:10.5px;padding:2px 7px;letter-spacing:.02em }
+  :root[data-look="boutique"] .pill.off { background:var(--accent);color:#fff }
+  :root[data-look="boutique"] .pill.ok { background:var(--ink);color:var(--bg) }
+  :root[data-look="boutique"] .cats { gap:16px;margin-top:16px }
+  :root[data-look="boutique"] a.ct { width:78px }
+  :root[data-look="boutique"] .ct .ci { width:78px;height:78px;border-radius:50% }
+  :root[data-look="boutique"] a.bg { padding:0;background:none }
+  :root[data-look="boutique"] .bg .ci { aspect-ratio:1 / 1 }
+  :root[data-look="boutique"] .bg .nm { margin:10px 0 0 }
+  :root[data-look="boutique"] .bg .ct2 { margin:2px 0 0 }
+  :root[data-look="boutique"] .bn { padding:0;min-height:330px;align-items:flex-end }
+  :root[data-look="boutique"] .bn::after { content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.04) 35%,rgba(0,0,0,.58) 100%) }
+  :root[data-look="boutique"] .bn .bi { left:0;width:100% }
+  :root[data-look="boutique"] .bn .bi img { -webkit-mask-image:none;mask-image:none }
+  :root[data-look="boutique"] .bn .txt { width:auto;padding:22px 20px 48px;color:#fff }
+  :root[data-look="boutique"] .bn .kick { color:rgba(255,255,255,.82) }
+  :root[data-look="boutique"] .bn h2 { font-family:var(--display);font-weight:400;font-size:38px;line-height:1.0;letter-spacing:-.01em }
+  :root[data-look="boutique"] .bn .pr { color:#fff;font-weight:500;font-size:14px }
+  :root[data-look="boutique"] .bn .btn { background:#fff;color:#1b1b1a;padding:12px 28px }
+  :root[data-look="boutique"] .bn .dots { left:20px;bottom:18px }
+  :root[data-look="boutique"] .bn .dots i { background:rgba(255,255,255,.5) }
+  :root[data-look="boutique"] .bn .dots i.on { background:#fff }
+  :root[data-look="boutique"] .bn:has(.bi .svgi)::after { background:none }
+  :root[data-look="boutique"] .bn:has(.bi .svgi) .txt, :root[data-look="boutique"] .bn:has(.bi .svgi) .kick, :root[data-look="boutique"] .bn:has(.bi .svgi) .pr { color:var(--ink) }
+  :root[data-look="boutique"] .bn:has(.bi .svgi) .btn { background:var(--ink);color:var(--bg) }
+  :root[data-look="boutique"] a.chip { background:none;box-shadow:inset 0 0 0 1px var(--line) }
+  :root[data-look="boutique"] a.chip[aria-current="true"] { background:var(--ink);color:var(--bg);box-shadow:none }
+  :root[data-look="boutique"] .tabbar { border-top:1px solid var(--line) }
+  :root[data-look="boutique"] .tabbar a[aria-current="page"] { color:var(--accent) }
+  :root[data-look="boutique"] .tabbar .bd { background:var(--accent);color:#fff }
+  :root[data-look="boutique"] .sbox { background:none;border-bottom:1px solid var(--ink);padding:0 }
+  :root[data-look="boutique"] .d-head h1 { font-family:var(--display);font-weight:400;font-size:32px;line-height:1.02;margin:0 }
+  :root[data-look="boutique"] .d-head .p { font-family:var(--display);font-size:32px;line-height:1.02;white-space:nowrap }
+  :root[data-look="boutique"] .blk { background:none;padding:14px 0;border-top:1px solid var(--line);margin-top:0 }
+  :root[data-look="boutique"] .cta .in .btn:first-child { background:var(--accent);color:#fff;height:52px;letter-spacing:.02em;font-size:14.5px }
+  :root[data-look="boutique"] .gal-slide { max-height:56vh }
+  :root[data-look="boutique"] .panel { padding: 16px 0; border-top: 1px solid var(--line); margin-top: 0 }
+</style>
+</head>
+<body>
+<div id="banner"></div>
+<main id="app"></main>
+<button class="fab" id="fab" type="button" aria-label="Filter and sort"></button>
+<div class="sheet-bg" id="sheetBg"><div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-label="Filter and sort"></div></div>
+<div class="tabbar"><nav aria-label="Main">
+  <a href="#/home" id="t-home"></a>
+  <a href="#/browse" id="t-browse"></a>
+  <a href="#/saved" id="t-saved"></a>
+  <a href="#/checkout" id="t-checkout"></a>
+</nav></div>
+<script>
+(function () {
+  var ICONS = {
+    plane: '<path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/>',
+    laptop: '<path d="M20 16V7a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v9m16 0H4m16 0 1.28 2.55a1 1 0 0 1-.9 1.45H3.62a1 1 0 0 1-.9-1.45L4 16"/>',
+    shirt: '<path d="M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.47a1 1 0 0 0 .99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.47a2 2 0 0 0-1.34-2.23z"/>',
+    sofa: '<path d="M20 9V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v3"/><path d="M2 11v5a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-5a2 2 0 0 0-4 0v2H6v-2a2 2 0 0 0-4 0z"/><path d="M4 18v2M20 18v2"/>',
+    paw: '<circle cx="6" cy="10" r="2"/><circle cx="10" cy="5.5" r="2"/><circle cx="14" cy="5.5" r="2"/><circle cx="18" cy="10" r="2"/><path d="M12 11c-3 0-5.5 3-5.5 5.5 0 2 1.5 2.5 3 2.5 1 0 1.5-.5 2.5-.5s1.5.5 2.5.5c1.5 0 3-.5 3-2.5C17.5 14 15 11 12 11z"/>',
+    sparkle: '<path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/><path d="M20 3v4M22 5h-4M4 17v2M5 18H3"/>',
+    tag: '<path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/><circle cx="7.5" cy="7.5" r=".5"/>',
+    menu: '<path d="M4 6h16M4 12h16M4 18h10"/>',
+    search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
+    bag: '<path d="M6 7h12l1 13H5L6 7z"/><path d="M9 7a3 3 0 0 1 6 0"/>',
+    heart: '<path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>',
+    home: '<path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/>',
+    grid: '<rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/>',
+    sliders: '<path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/>',
+    back: '<path d="M15 5l-7 7 7 7"/>',
+    user: '<circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/>'
+  };
+  var GROUPS = [
+    {id:"travel",   name:"Travel",            icon:"plane",   cats:[["flights","Flights"]]},
+    {id:"tech",     name:"Tech & Apple",      icon:"laptop",  cats:[["apple","Apple"],["electronics","Electronics"]]},
+    {id:"clothing", name:"Clothing & Style",  icon:"shirt",   cats:[["clothing","Clothing"],["shoes","Shoes"],["handbags","Handbags"],["jewelry","Jewelry"],["underwear","Underwear"],["fashion","Designer finds"]]},
+    {id:"beauty",   name:"Beauty & Care",     icon:"sparkle", cats:[["perfume","Perfume"],["makeup","Makeup"],["skincare","Skincare"],["personalcare","Wipes & deodorant"]]},
+    {id:"home",     name:"Home & Appliances", icon:"sofa",    cats:[["appliances","Appliances"],["decor","Decor"]]},
+    {id:"pets",     name:"Pets & Household",  icon:"paw",     cats:[["pets","Pet food & litter"],["cats","Cat furniture"],["home","Household staples"]]},
+    {id:"amazon",   name:"Amazon & Watchlist",icon:"tag",     cats:[["amazon","Amazon"],["watchlist","Your watchlist"]]}
+  ];
+  var CAT_GROUP = {};
+  GROUPS.forEach(function (g) { g.cats.forEach(function (c) { CAT_GROUP[c[0]] = g.id; }); });
+  function groupOf(cat) { return CAT_GROUP[cat] || "more"; }
+  function groupById(id) { return GROUPS.filter(function (g) { return g.id === id; })[0] || {id:"more", name:"More deals", icon:"tag", cats:[]}; }
+
+  var data = [], active = "all", sortMode = "hot";
+  var filters = { verified: false, coupon: false };
+  var MAX_AGE_H = 72;   // hide deals older than this, so only live deals show
+  var app = document.getElementById("app");
+  var subText = "", updatedText = "", scanStats = null;
+
+  var store = {
+    get: function (k) { try { return localStorage.getItem(k) || ""; } catch (e) { return ""; } },
+    set: function (k, v) { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } }
+  };
+  var look = store.get("dw_look") === "minimal" ? "minimal" : "boutique";
+  function applyLook() { document.documentElement.setAttribute("data-look", look); }
+  applyLook();
+  function boutique() { return look === "boutique"; }
+
+  /* ---------- helpers ---------- */
+  function money(n) { return "$" + (n >= 100 ? Math.round(n).toLocaleString() : n.toFixed(2)); }
+  function ago(ts) {
+    var s = Math.max(1, Math.floor(Date.now() / 1000 - ts));
+    if (s < 3600) return Math.max(1, Math.round(s / 60)) + "m ago";
+    if (s < 86400) return Math.round(s / 3600) + "h ago";
+    return Math.round(s / 86400) + "d ago";
+  }
+  function el(tag, cls, text) { var n = document.createElement(tag); if (cls) n.className = cls; if (text !== undefined) n.textContent = text; return n; }
+  function ico(name, extra) { var s = el("span", "svgi" + (extra ? " " + extra : "")); s.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true">' + ICONS[name] + '</svg>'; return s; }
+  function tcase(s) { return String(s).replace(/(^|[\s+&-])([a-z])/g, function (m, a, b) { return a + b.toUpperCase(); }); }
+  function src(s) { return String(s || "").replace(/^Slickdeals [a-z]+: .*$/i, "Slickdeals"); }
+  function hashStr(s) { var h = 0; for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return (h >>> 0).toString(36); }
+  function idOf(a) { return a.ts.toString(36) + hashStr(a.title || ""); }
+  function score(a) {
+    var base = a.score;
+    if (base === undefined || base === null) {
+      base = a.pct || 35;
+      if (a.verified) base += 15;
+      if (a.urgent) base += 20;
+      if (a.profit_ebay > 0) base += Math.min(a.profit_ebay / 10, 25);
+      if (a.coupon) base += 5;
+    }
+    return base * Math.pow(0.5, (Date.now() / 1000 - a.ts) / 3600 / 36);
+  }
+  function byScore(x, y) { return score(y) - score(x); }
+  function sorted(items) { return items.slice().sort(sortMode === "hot" ? byScore : function (x, y) { return y.ts - x.ts; }); }
+  function filtered(items) { return items.filter(function (a) { return (!filters.verified || a.verified) && (!filters.coupon || (a.coupon && a.coupon.code)); }); }
+  function copy(text, btn, label) {
+    function done() { if (btn) { var o = label || btn.textContent; btn.textContent = "Copied"; setTimeout(function () { btn.textContent = o; }, 1400); } }
+    if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(text).then(done, fallback); } else { fallback(); }
+    function fallback() { var t = document.createElement("textarea"); t.value = text; document.body.appendChild(t); t.select(); try { document.execCommand("copy"); } catch (e) {} document.body.removeChild(t); done(); }
+  }
+  function emptyText(def) {
+    var s = scanStats;
+    if (!s || !s.posts) return def;
+    return "No live deals beat your thresholds yet. The last scan checked " + s.posts + " posts" +
+      (s.too_old ? " (" + s.too_old + " too old)" : "") +
+      (s.below_your_bar ? ", " + s.below_your_bar + " below your discount bar" : "") +
+      ". New deals appear here the moment one qualifies.";
+  }
+  function strike(a) {
+    if (!a.deal_price) return null;
+    if (a.market_median && a.market_median > a.deal_price * 1.05) return a.market_median;
+    if (a.was_price && a.was_price > a.deal_price * 1.05) return a.was_price;
+    return null;
+  }
+
+  /* ---------- saved deals ---------- */
+  function savedMap() { try { return JSON.parse(store.get("dw_saved") || "{}"); } catch (e) { return {}; } }
+  function isSaved(a) { return !!savedMap()[a._id]; }
+  function toggleSave(a) {
+    var m = savedMap();
+    if (m[a._id]) delete m[a._id]; else m[a._id] = a;
+    store.set("dw_saved", JSON.stringify(m)); updateBadge();
+  }
+  function savedList() { var m = savedMap(); return Object.keys(m).map(function (k) { var o = m[k]; o._id = k; return o; }); }
+  function findDeal(id) {
+    for (var i = 0; i < data.length; i++) if (data[i]._id === id) return data[i];
+    var m = savedMap(); if (m[id]) { m[id]._id = id; return m[id]; }
+    return null;
+  }
+  function heartBtn(a, cls) {
+    var b = el("button", cls); b.type = "button";
+    function paint() { var on = isSaved(a); b.classList.toggle("on", on); b.setAttribute("aria-pressed", String(on)); b.setAttribute("aria-label", on ? "Remove from saved" : "Save deal"); b.textContent = ""; b.appendChild(ico("heart", on ? "on" : "")); }
+    b.onclick = function (ev) { ev.preventDefault(); ev.stopPropagation(); toggleSave(a); paint(); };
+    paint(); return b;
+  }
+
+  /* ---------- tab bar ---------- */
+  function buildTabs() {
+    var tabs = boutique()
+      ? [["home", "Home", "home"], ["browse", "Catalog", "grid"], ["saved", "Favorites", "heart"], ["checkout", "Profile", "user"]]
+      : [["home", "Home", "home"], ["browse", "Browse", "grid"], ["saved", "Saved", "heart"], ["checkout", "Checkout", "bag"]];
+    tabs.forEach(function (t) {
+      var a = document.getElementById("t-" + t[0]); a.textContent = "";
+      a.appendChild(ico(t[2])); a.appendChild(document.createTextNode(t[1]));
+    });
+  }
+  buildTabs();
+  function updateBadge() {
+    var a = document.getElementById("t-saved"), old = a.querySelector(".bd"); if (old) a.removeChild(old);
+    var n = savedList().length; if (n) a.appendChild(el("span", "bd", String(n)));
+  }
+
+  /* ---------- pieces ---------- */
+  function photo(a, cls, iconName) {
+    var box = el("div", cls);
+    function fb() { box.textContent = ""; box.appendChild(ico(iconName)); }
+    if (a.image) {
+      var img = document.createElement("img"); img.src = a.image; img.alt = ""; img.loading = "lazy"; img.referrerPolicy = "no-referrer";
+      img.onerror = fb; box.appendChild(img);
+    } else { fb(); }
+    return box;
+  }
+  function productCard(a) {
+    var g = groupById(groupOf(a.category));
+    var c = el("article", "pc"), link = el("a"); link.href = "#/deal/" + a._id;
+    var im = photo(a, "pc-img", g.icon), badges = el("div", "badges");
+    if (a.pct) badges.appendChild(el("span", "pill off", "\u2212" + a.pct + "%"));
+    if (a.verified) badges.appendChild(el("span", "pill ok", "Verified"));
+    im.appendChild(badges); link.appendChild(im);
+    var b = el("div", "pc-b");
+    b.appendChild(el("div", "nm", a.title));
+    var pr = el("div", "pr");
+    if (a.deal_price) { pr.appendChild(document.createTextNode(money(a.deal_price))); var s = strike(a); if (s) pr.appendChild(el("s", null, money(s))); }
+    else { pr.textContent = a.pct ? a.pct + "% off" : "Deal"; }
+    b.appendChild(pr);
+    b.appendChild(el("div", "mt", src(a.source) + " \u2022 " + ago(a.ts)));
+    if (a.style_terms && a.style_terms.length) b.appendChild(el("div", "mt style", "Matches your style: " + a.style_terms.map(tcase).join(", ")));
+    link.appendChild(b); c.appendChild(link);
+    c.appendChild(heartBtn(a, "heart"));
+    return c;
+  }
+  function grid(items, emptyMsg, limit) {
+    var g = el("div", "grid");
+    if (!items.length) { g.appendChild(el("div", "empty", emptyMsg)); return g; }
+    items.slice(0, limit || 60).forEach(function (a) { g.appendChild(productCard(a)); });
+    return g;
+  }
+  function sectionHead(title, href, label) {
+    var s = el("div", "sh"); s.appendChild(el("h3", null, title));
+    if (href) { var a = el("a", null, label || "See All"); a.href = href; s.appendChild(a); }
+    return s;
+  }
+  function chip(label, href, current, zero) { var a = el("a", "chip" + (zero ? " zero" : ""), label); a.href = href; if (current) a.setAttribute("aria-current", "true"); return a; }
+  function count(pred) { return data.filter(pred).length; }
+  function refreshRow() {
+    var r = el("div", "refresh"); r.appendChild(el("span", null, updatedText));
+    var b = el("button", null, "Refresh"); b.type = "button"; b.onclick = load; r.appendChild(b); app.appendChild(r);
+  }
+  function topPhotoOf(gid) {
+    var items = data.filter(function (a) { return groupOf(a.category) === gid && a.image; }).sort(byScore);
+    return items[0] || null;
+  }
+  function groupTile(g, big) {
+    var n = count(function (a) { return groupOf(a.category) === g.id; });
+    var t = el("a", (big ? "bg" : "ct") + (n ? "" : " zero")); t.href = "#/g/" + g.id;
+    var top = topPhotoOf(g.id), ci = el("div", "ci");
+    if (top) {
+      var img = document.createElement("img"); img.src = top.image; img.alt = ""; img.loading = "lazy"; img.referrerPolicy = "no-referrer";
+      img.onerror = function () { ci.textContent = ""; ci.appendChild(ico(g.icon)); }; ci.appendChild(img);
+    } else { ci.appendChild(ico(g.icon)); }
+    t.appendChild(ci);
+    t.appendChild(el("div", "nm", g.name));
+    if (big) t.appendChild(el("div", "ct2", n ? n + " deal" + (n === 1 ? "" : "s") : "Watching"));
+    return t;
+  }
+  function backCircle(href) {
+    var a = el("a", "circ"); a.href = href; a.setAttribute("aria-label", "Back"); a.appendChild(ico("back"));
+    a.onclick = function (ev) { if (history.length > 1) { ev.preventDefault(); history.back(); } }; return a;
+  }
+
+  /* ---------- filter sheet ---------- */
+  var sheetBg = document.getElementById("sheetBg"), sheet = document.getElementById("sheet"), fab = document.getElementById("fab");
+  fab.appendChild(ico("sliders"));
+  function buildSheet() {
+    sheet.textContent = ""; sheet.appendChild(el("h3", null, "Sort & filter"));
+    var seg = el("div", "seg"); seg.setAttribute("role", "group");
+    [["hot", "Hottest"], ["new", "Newest"]].forEach(function (m) {
+      var b = el("button", null, m[1]); b.type = "button"; b.setAttribute("aria-pressed", String(sortMode === m[0]));
+      b.onclick = function () { sortMode = m[0]; buildSheet(); render(); }; seg.appendChild(b);
+    });
+    sheet.appendChild(seg);
+    [["verified", "Verified deals only"], ["coupon", "Has a promo code"]].forEach(function (t) {
+      var row = el("div", "tgl"); row.appendChild(el("span", null, t[1]));
+      var b = el("button"); b.type = "button"; b.setAttribute("role", "switch"); b.setAttribute("aria-label", t[1]); b.setAttribute("aria-pressed", String(filters[t[0]]));
+      b.onclick = function () { filters[t[0]] = !filters[t[0]]; buildSheet(); render(); }; row.appendChild(b); sheet.appendChild(row);
+    });
+    var done = el("button", "btn block", "Done"); done.type = "button"; done.style.marginTop = "12px"; done.onclick = closeSheet; sheet.appendChild(done);
+  }
+  function openSheet() { buildSheet(); sheetBg.classList.add("open"); }
+  function closeSheet() { sheetBg.classList.remove("open"); }
+  fab.onclick = openSheet;
+  sheetBg.addEventListener("click", function (ev) { if (ev.target === sheetBg) closeSheet(); });
+  document.addEventListener("keydown", function (ev) { if (ev.key === "Escape") closeSheet(); });
+
+  /* ---------- views ---------- */
+  function viewHome() {
+    var cats0 = false;
+    var head = el("div", "head"), l = el("div", "l"), r = el("div", "r");
+    var menu = el("a", "ib"); menu.href = "#/browse"; menu.setAttribute("aria-label", "Browse categories"); menu.appendChild(ico("menu")); l.appendChild(menu);
+    l.appendChild(el("div", "brand", "dealwatch")); head.appendChild(l);
+    var s = el("a", "ib"); s.href = "#/search"; s.setAttribute("aria-label", "Search deals"); s.appendChild(ico("search")); r.appendChild(s);
+    var bag = el("a", "ib"); bag.href = "#/checkout"; bag.setAttribute("aria-label", "Checkout"); bag.appendChild(ico("bag")); r.appendChild(bag);
+    head.appendChild(r); app.appendChild(head);
+    if (subText) app.appendChild(el("p", "sub", subText));
+
+    var fresh = filtered(data.filter(function (a) { return Date.now() / 1000 - a.ts < 48 * 3600; })).sort(byScore);
+    if (fresh.length) {
+      var wrap = el("div", "bn-wrap"), track = el("div", "bn-track"), slides = fresh.slice(0, 3);
+      slides.forEach(function (a) {
+        var g = groupById(groupOf(a.category));
+        var sl = el("a", "bn"); sl.href = "#/deal/" + a._id;
+        var tx = el("div", "txt"); tx.appendChild(el("div", "kick", "Hottest right now"));
+        tx.appendChild(el("h2", null, a.title));
+        tx.appendChild(el("div", "pr", (a.deal_price ? money(a.deal_price) + "  \u2022  " : "") + (a.pct ? a.pct + "% off" : "Deal")));
+        var go = el("span", "btn", boutique() ? "Discover" : "Shop now"); tx.appendChild(go); sl.appendChild(tx);
+        sl.appendChild(photo(a, "bi", g.icon)); track.appendChild(sl);
+      });
+      wrap.appendChild(track);
+      var dots = el("div", "dots"); slides.forEach(function (_, i) { dots.appendChild(el("i", i === 0 ? "on" : "")); }); wrap.appendChild(dots);
+      track.addEventListener("scroll", function () {
+        var i = Math.round(track.scrollLeft / Math.max(1, track.clientWidth));
+        Array.prototype.forEach.call(dots.children, function (d, k) { d.className = k === i ? "on" : ""; });
+      });
+      app.appendChild(wrap);
+    }
+
+    if (!boutique()) app.appendChild(sectionHead("Shop by Category", "#/browse"));
+    else cats0 = true;
+    var cats = el("div", "cats");
+    var gs = GROUPS.slice();
+    if (data.some(function (a) { return groupOf(a.category) === "more"; })) gs.push(groupById("more"));
+    gs.forEach(function (g) { cats.appendChild(groupTile(g, false)); });
+    app.appendChild(cats);
+
+    var mine = filtered(data).filter(function (a) { return a.style_terms && a.style_terms.length; }).sort(byScore);
+    if (mine.length) { app.appendChild(sectionHead(boutique() ? "Picked for you" : "For You", "#/deals", boutique() ? "View all" : "See All")); app.appendChild(grid(mine, "", 4)); }
+    app.appendChild(sectionHead(boutique() ? "Popular" : "Trending Now", "#/deals", boutique() ? "View all" : "See All"));
+    app.appendChild(grid(filtered(data).sort(byScore), emptyText("No deals yet. Dealwatch is watching and will alert you."), 6));
+    var newest = filtered(data).sort(function (x, y) { return y.ts - x.ts; });
+    if (newest.length > 6) { app.appendChild(sectionHead("Just In", "#/deals")); app.appendChild(grid(newest, "", 4)); }
+    refreshRow();
+  }
+
+  function viewBrowse() {
+    app.appendChild(el("h1", "ptitle", boutique() ? "Catalog" : "Categories"));
+    app.appendChild(el("p", "psub", "Everything Dealwatch is watching for you"));
+    var g = el("div", "bgrid");
+    var gs = GROUPS.slice();
+    if (data.some(function (a) { return groupOf(a.category) === "more"; })) gs.push(groupById("more"));
+    gs.forEach(function (x) { g.appendChild(groupTile(x, true)); });
+    app.appendChild(g);
+    var all = el("a", "btn ghost block", "See all " + data.length + " deals"); all.href = "#/deals"; all.style.marginTop = "14px"; app.appendChild(all);
+    refreshRow();
+  }
+
+  function viewGroup(gid, cid) {
+    var g = groupById(gid);
+    var items = data.filter(function (a) { return groupOf(a.category) === g.id; });
+    var pb = el("div", "pbar"); pb.appendChild(backCircle("#/browse")); app.appendChild(pb);
+    app.appendChild(el("h1", "ptitle", g.name));
+    app.appendChild(el("p", "psub", items.length + " deal" + (items.length === 1 ? "" : "s") + " found"));
+    if (g.cats.length > 1) {
+      var chips = el("div", "chips");
+      chips.appendChild(chip("All", "#/g/" + g.id, !cid));
+      g.cats.forEach(function (c) {
+        var n = count(function (a) { return a.category === c[0]; });
+        chips.appendChild(chip(c[1] + (n ? " " + n : ""), "#/g/" + g.id + "/" + c[0], cid === c[0], !n));
+      });
+      app.appendChild(chips);
+    }
+    var shown = cid ? items.filter(function (a) { return a.category === cid; }) : items;
+    var label = cid ? (g.cats.filter(function (c) { return c[0] === cid; })[0] || [0, "this category"])[1] : g.name;
+    app.appendChild(grid(sorted(filtered(shown)), "Nothing yet in " + label + ". Dealwatch is watching and will alert you."));
+    refreshRow();
+  }
+
+  function viewDeals(gid) {
+    var pb = el("div", "pbar"); pb.appendChild(backCircle("#/home")); app.appendChild(pb);
+    app.appendChild(el("h1", "ptitle", gid ? groupById(gid).name : "All deals"));
+    app.appendChild(el("p", "psub", data.length + " found"));
+    var chips = el("div", "chips");
+    chips.appendChild(chip("All", "#/deals", !gid));
+    GROUPS.forEach(function (g) {
+      var n = count(function (a) { return groupOf(a.category) === g.id; });
+      if (n) chips.appendChild(chip(g.name, "#/deals/" + g.id, gid === g.id));
+    });
+    app.appendChild(chips);
+    var items = gid ? data.filter(function (a) { return groupOf(a.category) === gid; }) : data;
+    app.appendChild(grid(sorted(filtered(items)), emptyText("No deals yet. Run dealwatch.py and check back.")));
+    refreshRow();
+  }
+
+  function viewSearch() {
+    var pb = el("div", "pbar"); pb.appendChild(backCircle("#/home"));
+    var box = el("label", "sbox"); box.appendChild(ico("search"));
+    var inp = el("input"); inp.type = "search"; inp.placeholder = "Search deals, brands, stores"; inp.setAttribute("aria-label", "Search deals");
+    box.appendChild(inp); pb.appendChild(box); app.appendChild(pb);
+    var out = el("div"); app.appendChild(out);
+    function run() {
+      out.textContent = "";
+      var q = inp.value.trim().toLowerCase();
+      if (!q) {
+        out.appendChild(el("p", "psub", "Try a brand, a store, or a category"));
+        var chips = el("div", "chips");
+        GROUPS.forEach(function (g) { chips.appendChild(chip(g.name, "#/g/" + g.id, false)); });
+        out.appendChild(chips); return;
+      }
+      var hits = data.filter(function (a) {
+        var g = groupById(groupOf(a.category));
+        return (a.title + " " + a.source + " " + a.category + " " + g.name + " " + (a.detail || "")).toLowerCase().indexOf(q) !== -1;
+      });
+      out.appendChild(el("p", "psub", hits.length + " result" + (hits.length === 1 ? "" : "s")));
+      out.appendChild(grid(sorted(hits), "No matches. Dealwatch will alert you if one shows up."));
+    }
+    inp.addEventListener("input", run); run();
+  }
+
+  function viewSaved() {
+    app.appendChild(el("h1", "ptitle", boutique() ? "Favorites" : "Saved"));
+    var list = savedList().sort(function (x, y) { return y.ts - x.ts; });
+    app.appendChild(el("p", "psub", list.length ? list.length + " saved deal" + (list.length === 1 ? "" : "s") : "Tap the heart on a deal to keep it here"));
+    app.appendChild(grid(list, "Nothing saved yet."));
+  }
+
+  function compareBlock(a) {
+    var blk = el("section", "blk");
+    blk.appendChild(el("h4", null, "Compare prices at " + a.compare.length + " other store" + (a.compare.length === 1 ? "" : "s")));
+    var max = Math.max.apply(null, a.compare.map(function (c) { return c.price; }).concat(a.deal_price || 0));
+    var ladder = el("div", "ladder");
+    function row(name, price, url, you) {
+      var r = el(url ? "a" : "div", "lr" + (you ? " you" : ""));
+      if (url) { r.href = url; r.target = "_blank"; r.rel = "noopener"; }
+      var line = el("div", "line"); line.appendChild(el("span", null, name));
+      var right = el("span"); right.appendChild(el("b", null, money(price)));
+      if (!you && a.deal_price) { var d = price - a.deal_price; right.appendChild(el("em", null, (d >= 0 ? "+" : "\u2212") + money(Math.abs(d)))); }
+      line.appendChild(right); r.appendChild(line);
+      var bar = el("div", "bar"), fill = el("i"); fill.style.width = Math.max(6, Math.round(price / max * 100)) + "%"; bar.appendChild(fill); r.appendChild(bar);
+      ladder.appendChild(r);
+    }
+    if (a.deal_price) row("This deal", a.deal_price, null, true);
+    a.compare.forEach(function (c) { row(c.store, c.price, c.url, false); });
+    blk.appendChild(ladder);
+    if (a.market_median) blk.appendChild(el("p", null, "Median across listings: " + money(a.market_median) + ". Matches come from Google Shopping and may include similar models."));
+    return blk;
+  }
+
+  function viewDeal(id) {
+    var a = findDeal(id);
+    if (!a) {
+      var pb = el("div", "pbar"); pb.appendChild(backCircle("#/home")); app.appendChild(pb);
+      app.appendChild(el("div", "empty", "This deal is no longer in the list.")); return;
+    }
+    var g = groupById(groupOf(a.category));
+    var photos = (a.images && a.images.length) ? a.images : (a.image ? [a.image] : []);
+    var gal = el("div", "gal"), track = el("div", "gal-track");
+    if (photos.length) {
+      photos.forEach(function (u, i) {
+        var s = el("div", "gal-slide"), img = document.createElement("img");
+        img.src = u; img.alt = a.title + (photos.length > 1 ? ", photo " + (i + 1) : ""); img.referrerPolicy = "no-referrer";
+        if (i) img.loading = "lazy";
+        img.onerror = function () { s.textContent = ""; s.appendChild(ico(g.icon)); };
+        s.appendChild(img); track.appendChild(s);
+      });
+    } else { var s0 = el("div", "gal-slide"); s0.appendChild(ico(g.icon)); track.appendChild(s0); }
+    gal.appendChild(track);
+    var tl = el("div", "tl"); tl.appendChild(backCircle("#/g/" + g.id)); gal.appendChild(tl);
+    var tr = el("div", "tr"); tr.appendChild(heartBtn(a, "circ")); gal.appendChild(tr);
+    if (photos.length > 1) {
+      var dots = el("div", "dots"); photos.forEach(function (_, i) { dots.appendChild(el("i", i === 0 ? "on" : "")); }); gal.appendChild(dots);
+      track.addEventListener("scroll", function () {
+        var i = Math.round(track.scrollLeft / Math.max(1, track.clientWidth));
+        Array.prototype.forEach.call(dots.children, function (d, k) { d.className = k === i ? "on" : ""; });
+      });
+    }
+    if (a.image_credit) gal.appendChild(el("div", "cap", a.image_credit));
+    app.appendChild(gal);
+
+    var body = el("div", "d-body");
+    if (boutique()) {
+      var hd = el("div", "d-head"); hd.appendChild(el("h1", null, a.title));
+      if (a.deal_price) hd.appendChild(el("span", "p", money(a.deal_price)));
+      body.appendChild(hd);
+      var rows = el("div"); rows.style.marginTop = "14px";
+      function drow(k, v) { var r = el("div", "drow"); r.appendChild(el("span", "k", k)); r.appendChild(el("span", "v", v)); rows.appendChild(r); }
+      drow("Store", src(a.source)); drow("Found", ago(a.ts));
+      drow("Discount", a.pct ? "\u2212" + a.pct + "%" : a.detail);
+      var st2 = strike(a); if (st2) drow("Other stores", money(st2));
+      if (a.verified) drow("Verified", a.market_savings + "% below other stores");
+      else if (a.market_savings !== null && a.market_savings !== undefined && a.market_median) drow("Other stores", a.market_savings > 0 ? a.market_savings + "% below" : "Not below. Check before buying.");
+      if (a.detail && a.pct) drow("Details", a.detail);
+      if (a.style_terms && a.style_terms.length) drow("Your style", a.style_terms.map(tcase).join(", "));
+      body.appendChild(rows);
+    } else {
+      body.appendChild(el("h1", "d-title", a.title));
+      var pr = el("div", "d-price");
+      if (a.deal_price) { pr.appendChild(el("b", null, money(a.deal_price))); var st = strike(a); if (st) pr.appendChild(el("s", null, money(st))); }
+      if (a.pct) pr.appendChild(el("span", "pill off", "\u2212" + a.pct + "%"));
+      if (a.verified) pr.appendChild(el("span", "pill ok", "Verified"));
+      body.appendChild(pr);
+      body.appendChild(el("p", "d-note", a.detail + " \u2022 " + src(a.source) + " \u2022 " + ago(a.ts)));
+      if (a.verified) body.appendChild(el("p", "d-note", a.market_savings + "% below other stores"));
+      else if (a.market_savings !== null && a.market_savings !== undefined && a.market_median) body.appendChild(el("p", "d-note", a.market_savings > 0 ? a.market_savings + "% below other stores" : "Not below other stores. Check before buying."));
+    }
+    if (a.caution) { var cb = el("section", "blk"); cb.appendChild(el("h4", null, "Check the seller")); cb.appendChild(el("p", null, a.caution)); body.appendChild(cb); }
+    if (a.coupon) {
+      var cp = el("section", "blk"); cp.appendChild(el("h4", null, a.coupon.code ? "Promo code" : "Coupon"));
+      var row = el("div", "code");
+      if (a.coupon.code) {
+        row.appendChild(el("code", null, a.coupon.code));
+        var cbn = el("button", "btn", "Copy code"); cbn.type = "button"; cbn.onclick = function () { copy(a.coupon.code, cbn, "Copy code"); }; row.appendChild(cbn);
+      } else { row.appendChild(el("span", null, "Clip the on-page coupon before checkout")); }
+      cp.appendChild(row);
+      if (a.coupon.price_after) cp.appendChild(el("p", null, "About " + money(a.coupon.price_after) + " after the code"));
+      if (a.find_codes) { var fc = el("a", null, "Find more codes"); fc.href = a.find_codes; fc.target = "_blank"; fc.rel = "noopener"; fc.style.cssText = "color:var(--ink);font-weight:600;font-size:13.5px"; cp.appendChild(fc); }
+      body.appendChild(cp);
+    }
+    if (a.profit_ebay !== null && a.profit_ebay !== undefined) {
+      var f = function (n) { return (n < 0 ? "\u2212$" : "$") + Math.abs(n); };
+      var rb = el("section", "blk"); rb.appendChild(el("h4", null, "Resale estimate"));
+      rb.appendChild(el("p", null, "eBay " + f(a.profit_ebay) + " profit after fees and shipping. Facebook Marketplace (local) " + f(a.profit_fb) + ". Similar listings sell near $" + a.resale_median + "."));
+      body.appendChild(rb);
+    }
+    if (a.compare && a.compare.length) body.appendChild(compareBlock(a));
+    app.appendChild(body);
+
+    var cta = el("div", "cta"), inn = el("div", "in");
+    if (a.url) { var o = el("a", "btn", "Open deal"); o.href = a.url; o.target = "_blank"; o.rel = "noopener"; inn.appendChild(o); }
+    var saved = store.get("dw_addr");
+    if (saved) { var ab = el("button", "btn ghost", "Copy address"); ab.type = "button"; ab.onclick = function () { copy(saved, ab, "Copy address"); }; inn.appendChild(ab); }
+    cta.appendChild(inn); app.appendChild(cta);
+  }
+
+  function viewCheckout() {
+    app.appendChild(el("h1", "ptitle", boutique() ? "Profile" : "Checkout"));
+    app.appendChild(el("p", "psub", "Get to the buy button faster"));
+    var p = el("section", "panel"); p.appendChild(el("h3", null, "Shipping address"));
+    p.appendChild(el("p", "hint", "Saved on this phone only. Never uploaded. Tap Copy address on any deal when a store asks where to ship."));
+    var ta = el("textarea"); ta.rows = 4; ta.value = store.get("dw_addr"); ta.setAttribute("aria-label", "Shipping address"); ta.placeholder = "Street, apt\nCity, State ZIP\nCountry"; p.appendChild(ta);
+    var msg = el("p", "hint"), btns = el("div", "row2");
+    var save = el("button", "btn", "Save"); save.type = "button";
+    save.onclick = function () { msg.textContent = store.set("dw_addr", ta.value.trim()) ? "Saved on this device." : "Couldn't save here. You can still paste and copy it."; };
+    var cp = el("button", "btn ghost", "Copy"); cp.type = "button"; cp.onclick = function () { copy(ta.value.trim(), cp, "Copy"); };
+    btns.appendChild(save); btns.appendChild(cp); p.appendChild(btns); p.appendChild(msg); app.appendChild(p);
+    var p2 = el("section", "panel"); p2.appendChild(el("h3", null, "Apple Pay"));
+    p2.appendChild(el("p", "hint", "Apple Pay only works on a store's own checkout. When a store offers it, your address comes from Wallet. On iPhone, open Settings, then Wallet & Apple Pay, then Shipping Address, and set it once."));
+    app.appendChild(p2);
+    var p3 = el("section", "panel"); p3.appendChild(el("h3", null, "Appearance"));
+    var seg = el("div", "seg"); seg.setAttribute("role", "group"); seg.setAttribute("aria-label", "Appearance");
+    [["boutique", "Boutique"], ["minimal", "Minimal"]].forEach(function (m) {
+      var b = el("button", null, m[1]); b.type = "button"; b.setAttribute("aria-pressed", String(look === m[0]));
+      b.onclick = function () { look = m[0]; store.set("dw_look", look); applyLook(); buildTabs(); updateBadge(); render(); };
+      seg.appendChild(b);
+    });
+    seg.style.marginTop = "8px"; p3.appendChild(seg);
+    p3.appendChild(el("p", "hint", "Boutique is ivory with serif headlines. Minimal is warm gray with rounded tiles."));
+    app.appendChild(p3);
+    var p4 = el("section", "panel"); p4.appendChild(el("h3", null, "Your style"));
+    if (styleData && ((styleData.brands || []).length || (styleData.keywords || []).length)) {
+      p4.appendChild(el("p", "hint", "Deals that match these get a boost and a spot in Picked for you."));
+      p4.appendChild(el("p", null, (styleData.brands || []).concat(styleData.keywords || []).slice(0, 24).join(", ")));
+    } else { p4.appendChild(el("p", "hint", "No style profile yet.")); }
+    p4.appendChild(el("p", "hint", "Connect Pinterest by running the importer (see the README), or edit style.json by hand."));
+    app.appendChild(p4);
+    refreshRow();
+  }
+
+  /* ---------- router ---------- */
+  function render() {
+    var parts = (location.hash || "#/home").replace(/^#\//, "").split("/");
+    var v = parts[0] || "home";
+    app.textContent = ""; closeSheet();
+    var tabFor = { home: "home", search: "", deals: "home", browse: "browse", g: "browse", saved: "saved", checkout: "checkout", deal: "" }[v];
+    ["home", "browse", "saved", "checkout"].forEach(function (k) {
+      var n = document.getElementById("t-" + k);
+      if (k === (tabFor === undefined ? "home" : tabFor)) n.setAttribute("aria-current", "page"); else n.removeAttribute("aria-current");
+    });
+    document.body.classList.toggle("no-tabs", v === "deal");
+    fab.style.display = (v === "deals" || v === "g") ? "grid" : "none";
+    if (v === "g") viewGroup(parts[1], parts[2]);
+    else if (v === "deals") viewDeals(parts[1]);
+    else if (v === "browse") viewBrowse();
+    else if (v === "search") viewSearch();
+    else if (v === "saved") viewSaved();
+    else if (v === "deal") viewDeal(parts[1]);
+    else if (v === "checkout") viewCheckout();
+    else viewHome();
+    var cur = app.querySelector('a.chip[aria-current="true"]');
+    if (cur && cur.scrollIntoView) { try { cur.scrollIntoView({ inline: "center", block: "nearest" }); } catch (e) {} }
+  }
+  var lastHash = "";
+  window.addEventListener("hashchange", function () {
+    var h = location.hash || "#/home";
+    render(); if (h !== lastHash) window.scrollTo(0, 0); lastHash = h;
+  });
+
+  function load() {
+    fetch("alerts.json?t=" + Date.now(), { cache: "no-store" })
+      .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(function (j) {
+        j = j.filter(function (a) { return Date.now() / 1000 - a.ts < MAX_AGE_H * 3600; });
+        data = j; data.forEach(function (a) { a._id = idOf(a); });
+        var hot = j.filter(function (a) { return a.urgent && Date.now() / 1000 - a.ts < 86400; }).length;
+        subText = hot ? hot + " urgent deal" + (hot === 1 ? "" : "s") + " today" : "Nothing urgent today";
+        updatedText = "Updated " + new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+        updateBadge(); render();
+      })
+      .catch(function () {
+        subText = "Couldn't load alerts.json. Serve this folder over http (see README).";
+        updateBadge(); render();
+      });
+  }
+  var styleData = null;
+  function loadStyle() {
+    fetch("style.json?t=" + Date.now(), { cache: "no-store" })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) { styleData = j; })
+      .catch(function () {});
+  }
+  function loadStats() {
+    if (!window.fetch) return;
+    fetch("top.json?t=" + Date.now(), { cache: "no-store" })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) { scanStats = (j && j.stats) || null; if (scanStats) render(); })
+      .catch(function () {});
+  }
+  updateBadge(); load(); loadStyle(); loadStats();
+  if ("serviceWorker" in navigator) { try { navigator.serviceWorker.register("sw.js"); } catch (e) {} }
+})();
+</script>
+</body>
+</html>

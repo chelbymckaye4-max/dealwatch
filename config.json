@@ -1,7 +1,7 @@
 {
   "_help": "Edit values and commit. Percent values are minimum discount to alert. AMAZON_WATCHLIST: ASIN -> label. URL_WATCHLIST: product URL -> label.",
-  "PCT_THRESHOLD": 45,
-  "LUXURY_PCT_THRESHOLD": 45,
+  "PCT_THRESHOLD": 60,
+  "LUXURY_PCT_THRESHOLD": 60,
   "APPLE_PCT_THRESHOLD": 25,
   "BRAND_PCT_THRESHOLD": 50,
   "BESTBUY_PCT": 60,
@@ -107,7 +107,9 @@
     "designer shoes",
     "womens loafers",
     "womens flats",
-    "hogan"
+    "hogan",
+    "womens hiking shoes",
+    "womens snow boots"
   ],
   "APPLE_FAV_PCT": 20,
   "CAT_PCT_THRESHOLD": 55,
@@ -139,7 +141,8 @@
     "makeup": 1,
     "perfume": 1,
     "personalcare": 2,
-    "favorites": 1
+    "favorites": 1,
+    "skincare": 2
   },
   "CAT_SEARCH_TERMS": [
     "cat tree",
@@ -176,7 +179,9 @@
     "hanky panky",
     "cosabella",
     "skims underwear",
-    "victoria's secret panties"
+    "victoria's secret panties",
+    "shapewear",
+    "spanx"
   ],
   "APPLIANCE_SEARCH_TERMS": [
     "roomba",
@@ -246,7 +251,11 @@
     "Blue Buffalo",
     "Fancy Feast",
     "Tidy Cats",
-    "dog treats"
+    "dog treats",
+    "self cleaning litter box",
+    "automatic litter box",
+    "Litter-Robot",
+    "IAMS dog food"
   ],
   "PET_PCT_THRESHOLD": 40,
   "UNIT_TARGETS": {
@@ -275,7 +284,10 @@
     "amazon home",
     "amazon kitchen finds",
     "amazon bedding",
-    "perigold"
+    "perigold",
+    "curtains",
+    "floor lamp",
+    "standing desk"
   ],
   "CLEARANCE_SEARCH_TERMS": [
     "open box",
@@ -383,7 +395,11 @@
     "drunk elephant",
     "tatcha",
     "sunday riley",
-    "augustinus bader"
+    "augustinus bader",
+    "e.l.f",
+    "elf cosmetics",
+    "maybelline",
+    "lattafa"
   ],
   "BEAUTY_EXCLUDE": [
     "dupe",
@@ -403,9 +419,6 @@
     "perfume oil",
     "unbranded",
     "generic",
-    "e.l.f",
-    "elf cosmetics",
-    "maybelline",
     "l'oreal",
     "loreal",
     "l’oréal",
@@ -415,7 +428,7 @@
     "milani",
     "covergirl",
     "sephora collection",
-    "essence",
+    "essence cosmetics",
     "colourpop",
     "nivea",
     "jovan",
@@ -426,7 +439,6 @@
     "calvin klein",
     "adidas",
     "body fantasies",
-    "lattafa",
     "armaf"
   ],
   "MAKEUP_SEARCH_TERMS": [
@@ -526,5 +538,47 @@
   ],
   "OG_FETCH_BUDGET": 30,
   "GMAIL_MIN_PCT": 30,
-  "GMAIL_MAX": 25
+  "GMAIL_MAX": 25,
+  "FEED_MAX_AGE_HOURS": 48,
+  "FLIGHT_MAX_AGE_HOURS": 96,
+  "ALERT_MAX_AGE_HOURS": 72,
+  "SKINCARE_BRANDS": [
+    "aestura",
+    "dr.althea",
+    "dr. althea",
+    "dr althea",
+    "anua",
+    "the face shop",
+    "cerave",
+    "good molecules",
+    "cosrx",
+    "beauty of joseon",
+    "round lab",
+    "skin1004",
+    "laneige",
+    "innisfree",
+    "medicube",
+    "torriden",
+    "numbuzin",
+    "sulwhasoo",
+    "la roche-posay",
+    "la mer",
+    "drunk elephant",
+    "tatcha",
+    "sunday riley",
+    "glow recipe",
+    "paula's choice",
+    "augustinus bader"
+  ],
+  "SKINCARE_PCT_THRESHOLD": 35,
+  "SKINCARE_SEARCH_TERMS": [
+    "anua",
+    "cosrx",
+    "dr althea",
+    "aestura",
+    "korean skincare",
+    "cerave",
+    "beauty of joseon",
+    "laneige"
+  ]
 }
